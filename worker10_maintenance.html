@@ -1,0 +1,1172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker 10 — Maintenance/Capping Station | Nassenger 8 Digital Twin</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-alt: #f7f8fa;
+  --text: #1a1d23;
+  --text-muted: #6b7280;
+  --border: #e2e5ea;
+  --accent: #378ADD;
+  --accent-soft: rgba(55,138,221,0.1);
+  --green: #1D9E75;
+  --amber: #BA7517;
+  --red: #D85A30;
+  --chart-grid: rgba(0,0,0,0.08);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-alt: #22252f;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border: #2d3040;
+    --accent: #5a9fef;
+    --accent-soft: rgba(90,159,239,0.12);
+    --chart-grid: rgba(255,255,255,0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.3);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar h1 span {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.sim-time {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn:hover { background: var(--surface-alt); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.9; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: var(--red); color: #fff; }
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.speed-group {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.speed-group .btn {
+  border: none;
+  border-radius: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.speed-group .btn + .btn { border-left: 1px solid var(--border); }
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.progress-bar {
+  width: 100px;
+  height: 6px;
+  background: var(--surface-alt);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.main {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  min-height: calc(100vh - 52px);
+  align-items: flex-start;
+}
+
+.col-left, .col-right {
+  flex: 0 0 280px;
+  min-width: 0;
+}
+
+.col-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.card-body { padding: 12px 14px; }
+
+.slider-group { margin-bottom: 10px; }
+.slider-group:last-child { margin-bottom: 0; }
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.slider-label .name { color: var(--text); font-weight: 500; }
+.slider-label .val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.state-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.state-card.ok { border-color: var(--green); }
+.state-card.warn { border-color: var(--amber); background: rgba(186,117,23,0.06); }
+.state-card.crit { border-color: var(--red); background: rgba(216,90,48,0.06); }
+
+.state-card .sc-left { min-width: 0; }
+.state-card .sc-sym {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.state-card .sc-name { font-size: 11px; color: var(--text-muted); }
+.state-card .sc-val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.state-card .sc-unit { font-size: 10px; color: var(--text-muted); margin-left: 2px; font-weight: 400; }
+.state-card .sc-sparkline { width: 64px; height: 32px; flex-shrink: 0; }
+
+.schematic-wrap { padding: 12px; display: flex; justify-content: center; }
+.schematic-wrap svg { max-width: 100%; height: auto; }
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.chart-title {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+.chart-title .ct-value {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chart-canvas-wrap { padding: 6px 8px 8px; position: relative; }
+.chart-canvas-wrap canvas { width: 100%; display: block; }
+
+.parallel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  margin-left: 8px;
+}
+
+.formula-chain-toggle {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.formula-chain-toggle .arrow { transition: transform 0.2s ease; font-size: 10px; }
+.formula-chain-toggle .arrow.open { transform: rotate(90deg); }
+
+.formula-chain-body {
+  display: none;
+  padding: 0 14px 14px;
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", monospace;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.formula-chain-body.open { display: block; }
+
+.formula-step {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.formula-step:last-child { border-bottom: none; }
+
+.formula-step .step-num { font-weight: 700; color: var(--accent); margin-right: 6px; }
+
+.formula-step .step-title {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+}
+
+.formula-step .step-eq { color: var(--accent); font-size: 11px; }
+
+.formula-step .parallel-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.formula-step .sequential-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(55,138,221,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(55,138,221,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media (max-width: 900px) {
+  .main { flex-direction: column; }
+  .col-left, .col-right { flex: none; width: 100%; }
+  .charts-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Worker 10 — Maintenance/Capping Station<span>Nassenger 8 Digital Twin</span></h1>
+    <div class="sim-time" id="simTime">00:00:00</div>
+    <button class="btn primary" id="btnPlay">▶ Play</button>
+    <button class="btn" id="btnReset">↺ Reset</button>
+    <div class="speed-group">
+      <button class="btn active" data-speed="1">1×</button>
+      <button class="btn" data-speed="5">5×</button>
+      <button class="btn" data-speed="10">10×</button>
+      <button class="btn" data-speed="50">50×</button>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <span>CRI:</span>
+    <div class="progress-bar"><div class="progress-fill" id="criProgress"></div></div>
+    <span id="criPct">0%</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: Parameters -->
+  <div class="col-left">
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Seal & Cap</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Seal Stiffness</span><span class="val" id="v_k_seal">5000 N/m</span></div>
+          <input type="range" id="s_k_seal" min="1000" max="20000" step="100" value="5000">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Compression δ</span><span class="val" id="v_delta">0.002 m</span></div>
+          <input type="range" id="s_delta" min="0.0005" max="0.01" step="0.0001" value="0.002">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">P_atm</span><span class="val" id="v_P_atm">101325 Pa</span></div>
+          <input type="range" id="s_P_atm" min="90000" max="110000" step="100" value="101325">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">P_vacuum</span><span class="val" id="v_P_vac">20000 Pa</span></div>
+          <input type="range" id="s_P_vac" min="5000" max="60000" step="500" value="20000">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Suction Pump</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Flow Coeff C_v</span><span class="val" id="v_C_v">1.5e-6 m⁴/N⁰·⁵</span></div>
+          <input type="range" id="s_C_v" min="0.5e-6" max="5e-6" step="0.1e-6" value="1.5e-6">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Ink Density ρ</span><span class="val" id="v_rho_ink">1050 kg/m³</span></div>
+          <input type="range" id="s_rho_ink" min="900" max="1200" step="10" value="1050">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Purge Duration</span><span class="val" id="v_t_purge">0.50 s</span></div>
+          <input type="range" id="s_t_purge" min="0.1" max="2.0" step="0.01" value="0.5">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Wiper Blade</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Wiper Friction μ</span><span class="val" id="v_mu_wipe">0.350</span></div>
+          <input type="range" id="s_mu_wipe" min="0.1" max="0.8" step="0.01" value="0.35">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Contact Pressure</span><span class="val" id="v_P_contact">50000 Pa</span></div>
+          <input type="range" id="s_P_contact" min="10000" max="150000" step="1000" value="50000">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Blade Area</span><span class="val" id="v_A_blade">0.0005 m²</span></div>
+          <input type="range" id="s_A_blade" min="0.0001" max="0.002" step="0.0001" value="0.0005">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Clog Risk</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">P_clog Base</span><span class="val" id="v_P0">0.050</span></div>
+          <input type="range" id="s_P0" min="0.001" max="0.2" step="0.001" value="0.05">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Time Constant τ</span><span class="val" id="v_tau">300 s</span></div>
+          <input type="range" id="s_tau" min="60" max="1200" step="10" value="300">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Purge Effectiveness</span><span class="val" id="v_purge_eff">0.850</span></div>
+          <input type="range" id="s_purge_eff" min="0.3" max="1.0" step="0.01" value="0.85">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">CRI Warning</span><span class="val" id="v_CRI_warn">0.400</span></div>
+          <input type="range" id="s_CRI_warn" min="0.1" max="0.8" step="0.01" value="0.4">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Visualisation -->
+  <div class="col-center">
+
+    <!-- Schematic -->
+    <div class="card">
+      <div class="card-header">Schematic — Worker 10 Maintenance/Capping Station</div>
+      <div class="schematic-wrap">
+        <svg id="schematic" viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--chart-grid)" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="600" height="240" fill="url(#grid)" opacity="0.4"/>
+
+          <!-- Printhead -->
+          <rect x="240" y="40" width="120" height="50" rx="4" fill="var(--surface-alt)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="300" y="68" font-size="10" fill="var(--text)" text-anchor="middle" font-weight="600">Printhead</text>
+          <rect x="260" y="55" width="8" height="20" rx="1" fill="var(--accent)" opacity="0.5"/>
+          <rect x="280" y="55" width="8" height="20" rx="1" fill="var(--accent)" opacity="0.5"/>
+          <rect x="300" y="55" width="8" height="20" rx="1" fill="var(--accent)" opacity="0.5"/>
+          <rect x="320" y="55" width="8" height="20" rx="1" fill="var(--accent)" opacity="0.5"/>
+
+          <!-- Cap -->
+          <g id="sch_cap_group">
+            <rect id="sch_cap" x="250" y="100" width="100" height="30" rx="6" fill="var(--accent-soft)" stroke="var(--green)" stroke-width="2"/>
+            <text x="300" y="120" font-size="8" fill="var(--green)" text-anchor="middle" font-weight="600">CAP</text>
+          </g>
+
+          <!-- Suction tube -->
+          <path id="sch_suction" d="M350 115 Q380 115 380 90 Q380 65 350 65" fill="none" stroke="var(--amber)" stroke-width="2.5"/>
+          <polygon points="350,60 358,70 342,70" fill="var(--amber)" opacity="0.7"/>
+
+          <!-- Suction pump -->
+          <circle cx="400" cy="55" r="22" fill="var(--surface-alt)" stroke="var(--amber)" stroke-width="2"/>
+          <text x="400" y="59" font-size="8" fill="var(--amber)" text-anchor="middle" font-weight="700">PUMP</text>
+          <circle id="sch_pump_indicator" cx="400" cy="55" r="10" fill="none" stroke="var(--amber)" stroke-width="1.5" opacity="0.5"/>
+
+          <!-- Wiper blade -->
+          <g id="sch_wiper_group">
+            <line id="sch_wiper_arm" x1="180" y1="95" x2="240" y2="95" stroke="var(--red)" stroke-width="3" stroke-linecap="round"/>
+            <rect x="236" y="82" width="8" height="26" rx="2" fill="var(--red)" opacity="0.7"/>
+          </g>
+          <text x="210" y="80" font-size="8" fill="var(--red)" text-anchor="middle" font-weight="600">WIPER</text>
+
+          <!-- Ink drops -->
+          <circle id="sch_ink1" cx="270" cy="95" r="2" fill="var(--accent)" opacity="0.4"/>
+          <circle id="sch_ink2" cx="310" cy="95" r="2" fill="var(--accent)" opacity="0.4"/>
+          <circle id="sch_ink3" cx="330" cy="95" r="2" fill="var(--accent)" opacity="0.4"/>
+
+          <!-- Labels -->
+          <text x="300" y="145" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Seal: F_seal = k_seal · δ</text>
+          <text x="400" y="90" font-size="8" fill="var(--amber)" text-anchor="middle" font-weight="600">Suction: Q = C_v·√(ΔP/ρ)</text>
+          <text x="300" y="210" font-size="10" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Capping Station with Wiper & Suction</text>
+          <text id="sch_cri_val" x="300" y="230" font-size="9" fill="var(--text)" text-anchor="middle" font-weight="600" font-family="SF Mono, Menlo, monospace"></text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-title">Current Signature i(t) <span class="ct-value" id="ct_I_sig" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_signature" height="130"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Clog Risk Index (CRI) <span class="ct-value" id="ct_CRI" style="color:#D85A30">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_cri" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Suction Flow Rate <span class="ct-value" id="ct_Q" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_suction" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Cap Pressure <span class="ct-value" id="ct_Pcap" style="color:#378ADD">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_pressure" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Wipe Streaks <span class="ct-value" id="ct_streak" style="color:#1D9E75">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_streaks" height="130"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Formula Chain -->
+    <div class="card">
+      <div class="formula-chain-toggle" id="formulaToggle">
+        <span>Formula Chain (8 steps, parallel exec) <span class="parallel-badge">⚡ Parallel</span></span>
+        <span class="arrow" id="formulaArrow">▶</span>
+      </div>
+      <div class="formula-chain-body" id="formulaBody">
+        <div class="formula-step">
+          <span class="step-title">Step 1 — Cap Seal Contact <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">F_seal = k_seal · δ_compression</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 2 — Capping Pressure <span class="parallel-tag">1 parallel</span></span>
+          <span class="step-eq">[PARALLEL] P_cap = P_atm − P_vacuum</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 3 — Suction Flow <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">Q_suction = C_v · √(ΔP / ρ)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 4 — Ink Extraction Volume <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">V_extracted = Q_suction · t_purge</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 5 — Wiper Blade Mechanics <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">F_wipe = μ_wipe · P_contact · A_blade</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 6 — Wiping Streaks <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">streak_count ∝ (F_wipe / F_optimal − 1)²</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 7 — Clog Probability <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">P_clog = P₀ · e^(−t_capped/τ) · (1 − purge_effectiveness)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 8 — CRI (Clog Risk Index) <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">CRI = Σ(P_clog_i · w_i) across all heads</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: State Readouts -->
+  <div class="col-right">
+
+    <div class="card" style="margin-top:10px;">
+      <div class="card-header">Energy Fault Injection</div>
+      <div class="card-body" style="padding:10px; display:flex; gap:10px;">
+        <label style="font-size:11px;"><input type="checkbox" id="chk_stall"> Stall (I > 2.5x)</label>
+        <label style="font-size:11px;"><input type="checkbox" id="chk_overcurrent"> Overcurrent (1.5x)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Live State Variables</div>
+      <div class="card-body">
+        <div class="state-grid" id="stateGrid"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const WORKER_CODE = `
+self.onmessage = function(e) {
+  const { id, fn, params } = e.data;
+  let result;
+  const p = params;
+  switch(fn) {
+    case 'power_electronics': // LAYER A
+      result = { V_dc: 1.35 * p.V_line, V_bus: p.V_line * 1.35 - (p.I_load || 0) * p.R_bus, D: p.V_input ? p.V_input / (p.V_line * 1.35 + 1e-6) : 0.5, P_sw: 0.5 * (p.V_line * 1.35) * (p.I_load || 0) * (p.t_r + p.t_f) * p.f_sw, E_gate: 0.5 * p.C_gate * p.V_gs * p.V_gs };
+      break;
+    case 'motor_electrical_adv': // LAYER B
+      result = { delta_I: ((p.V_bus || 600) - (p.K_e||0.1) * (p.omega || 0)) * p.D * (1/p.f_sw) / (p.L_motor||0.05), P_elec: (p.V_input || 0) * (p.I_load || 0), P_cu: (p.I_load || 0) * (p.I_load || 0) * (p.R_motor||0.1), P_fe: p.k_h * p.f_elec * p.B_field * p.B_field + p.k_e * p.f_elec * p.f_elec * p.B_field * p.B_field };
+      break;
+    case 'current_signature': // LAYER C
+      result = { I_env: (p.T_load||10) / ((p.K_t||0.1) * p.efficiency), f_mesh: p.N_teeth * ((p.omega||0) * 60 / (2 * Math.PI)) / 60, f_bpfo: (p.N_balls / 2) * (((p.omega||0) * 60 / (2 * Math.PI)) / 60) * (1 - (p.d_ball / p.D_pitch) * Math.cos(p.alpha_contact)), THD_i: 0.05 };
+      break;
+    case 'mechanical_drive': // LAYER D
+      result = { theta_twist: (p.T_net || 0) * p.L_shaft / (p.G_shear * p.J_polar), delta_belt: (p.F_belt || 0) * p.L_belt / (p.E_belt * p.A_belt), P_gear: (p.T_net || 0) * (p.omega || 0) * (1 - p.eta_gear), T_bearing: (p.mu_b||0.01) * p.F_radial * p.r_bearing, omega_crit: Math.sqrt(p.k_shaft / p.J_shaft) };
+      break;
+    case 'load_energy': // LAYER E
+      result = { E_tension: 0.5 * (p.T_tension || 0)**2 * p.L_span / (p.E_fabric * p.A_fabric), P_nip: (p.F_nip || 0) / (2 * (p.r_roller || 0.1) * (p.w_fabric || 1)), Q_fabric: p.k_fabric * p.A_heat * (p.dT_dx || 0), E_meniscus: Math.PI * p.r_nozzle**2 * p.gamma_ink, E_piezo: 0.5 * p.C_piezo * p.V_drive**2 };
+      break;
+
+    case 'seal_force':
+      result = p.k_seal * p.delta;
+      break;
+    case 'cap_pressure':
+      result = p.P_atm - p.P_vac;
+      break;
+    case 'suction_flow':
+      result = p.C_v * Math.sqrt(p.dP / p.rho);
+      break;
+    case 'extraction_volume':
+      result = p.Q_suction * p.t_purge;
+      break;
+    case 'wipe_force':
+      result = p.mu_wipe * p.P_contact * p.A_blade;
+      break;
+    case 'streak_count':
+      const ratio = p.F_optimal > 1e-12 ? p.F_wipe / p.F_optimal : 1;
+      result = Math.round(p.k_streak * Math.pow(ratio - 1, 2));
+      break;
+    case 'clog_probability':
+      const exponent = p.t_capped / p.tau;
+      result = p.P0 * Math.exp(-exponent) * (1 - p.purge_eff);
+      break;
+    case 'cri_index':
+      result = p.sum_plog_weighted;
+      break;
+    default:
+      result = NaN;
+  }
+  self.postMessage({ id, result });
+};
+`;
+
+const WORKER_POOL_SIZE = 4;
+const workerPool = [];
+const workerQueue = [];
+let workerIdCounter = 0;
+
+function createWorker() {
+  const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  const worker = new Worker(url);
+  worker.busy = false;
+  worker.pending = null;
+  URL.revokeObjectURL(url);
+  return worker;
+}
+
+function initWorkerPool() {
+  for (let i = 0; i < WORKER_POOL_SIZE; i++) {
+    const w = createWorker();
+    w.onmessage = function(e) {
+      w.busy = false;
+      if (w.pending) {
+        const { resolve } = w.pending;
+        w.pending = null;
+        resolve(e.data.result);
+      }
+      drainWorkerQueue(w);
+    };
+    workerPool.push(w);
+  }
+}
+
+function drainWorkerQueue(worker) {
+  if (workerQueue.length === 0) return;
+  const task = workerQueue.shift();
+  worker.busy = true;
+  worker.postMessage({ id: task.id, fn: task.fn, params: task.params });
+}
+
+function execFormula(fn, params) {
+  return new Promise(resolve => {
+    const idle = workerPool.find(w => !w.busy);
+    if (idle) {
+      idle.busy = true;
+      idle.onmessage = function(e) {
+        idle.busy = false;
+        resolve(e.data.result);
+        drainWorkerQueue(idle);
+      };
+      idle.postMessage({ id: workerIdCounter++, fn, params });
+    } else {
+      workerQueue.push({ id: workerIdCounter++, fn, params, resolve });
+    }
+  });
+}
+
+async function execParallel(formulas) {
+  return Promise.all(formulas.map(f => execFormula(f.fn, f.params)));
+}
+
+const PARAMS = {
+  // LAYER A-E Energy Chain Params
+  D_pwm: 0.5, V_bus_nom: 600, t_r: 1e-7, t_f: 1e-7, f_sw: 10000, C_gate: 1e-9, V_gs: 15, R_bus: 0.1, V_line: 400,
+  k_h: 0.01, k_e: 0.001, B_field: 1.5, f_elec: 50,
+  efficiency: 0.9, N_teeth: 50, N_balls: 8, d_ball: 0.01, D_pitch: 0.05, alpha_contact: 0, I_nominal: 10,
+  L_shaft: 1.0, G_shear: 79e9, J_polar: 1e-4, L_belt: 2.0, E_belt: 1e9, A_belt: 0.001, eta_gear: 0.98, F_radial: 500, r_bearing: 0.02, k_shaft: 1e6, J_shaft: 0.05,
+  L_span: 1.0, k_fabric: 0.5, A_heat: 1.0, gamma_ink: 0.03, r_nozzle: 1e-5, C_piezo: 1e-6, V_drive: 50,
+  k_seal: 5000, delta: 0.002, P_atm: 101325, P_vac: 20000,
+  C_v: 1.5e-6, rho_ink: 1050, t_purge: 0.5,
+  mu_wipe: 0.35, P_contact: 50000, A_blade: 0.0005,
+  P0: 0.05, tau: 300, purge_eff: 0.85,
+  F_optimal: 6.125, k_streak: 50, CRI_warn: 0.4, CRI_crit: 0.7,
+  num_heads: 4,
+};
+
+const state = {
+  I_env: 0, delta_I: 0, fault_stall: false, fault_overcurrent: false,
+  F_seal: 0, P_cap: 0, Q_suction: 0, V_extracted: 0,
+  F_wipe: 0, streak_count: 0, P_clog: 0, CRI: 0,
+  t_capped: 0, purge_count: 0,
+  tickCount: 0, simTime: 0, running: false, speed: 1,
+};
+
+const DT = 0.01;
+
+const HIST_LEN = 300, SPARK_LEN = 50;
+const hist = { CRI: [], Q_suction: [], P_cap: [], streak_count: [] };
+  hist.I_signature = []; spark.I_signature = [];
+const spark = { F_seal:[], P_cap:[], Q_suction:[], V_extracted:[], F_wipe:[], streak_count:[], P_clog:[], CRI:[] };
+
+function pushHist(arr, val) { arr.push(val); if (arr.length > HIST_LEN) arr.shift(); }
+function pushSpark(arr, val) { arr.push(val); if (arr.length > SPARK_LEN) arr.shift(); }
+
+const sliderMap = [
+  { id:'s_k_seal', key:'k_seal', fmt:v=>v.toFixed(0)+' N/m', d:'v_k_seal' },
+  { id:'s_delta', key:'delta', fmt:v=>v.toFixed(4)+' m', d:'v_delta' },
+  { id:'s_P_atm', key:'P_atm', fmt:v=>v.toFixed(0)+' Pa', d:'v_P_atm' },
+  { id:'s_P_vac', key:'P_vac', fmt:v=>v.toFixed(0)+' Pa', d:'v_P_vac' },
+  { id:'s_C_v', key:'C_v', fmt:v=>v.toExponential(1)+' m⁴/N⁰·⁵', d:'v_C_v' },
+  { id:'s_rho_ink', key:'rho_ink', fmt:v=>v.toFixed(0)+' kg/m³', d:'v_rho_ink' },
+  { id:'s_t_purge', key:'t_purge', fmt:v=>v.toFixed(2)+' s', d:'v_t_purge' },
+  { id:'s_mu_wipe', key:'mu_wipe', fmt:v=>v.toFixed(3), d:'v_mu_wipe' },
+  { id:'s_P_contact', key:'P_contact', fmt:v=>v.toFixed(0)+' Pa', d:'v_P_contact' },
+  { id:'s_A_blade', key:'A_blade', fmt:v=>v.toFixed(4)+' m²', d:'v_A_blade' },
+  { id:'s_P0', key:'P0', fmt:v=>v.toFixed(3), d:'v_P0' },
+  { id:'s_tau', key:'tau', fmt:v=>v.toFixed(0)+' s', d:'v_tau' },
+  { id:'s_purge_eff', key:'purge_eff', fmt:v=>v.toFixed(3), d:'v_purge_eff' },
+  { id:'s_CRI_warn', key:'CRI_warn', fmt:v=>v.toFixed(3), d:'v_CRI_warn' },
+];
+
+sliderMap.forEach(s => {
+  const el = document.getElementById(s.id);
+  const disp = document.getElementById(s.d);
+  el.value = PARAMS[s.key];
+  disp.textContent = s.fmt(PARAMS[s.key]);
+  el.addEventListener('input', () => { PARAMS[s.key] = parseFloat(el.value); disp.textContent = s.fmt(PARAMS[s.key]); });
+});
+
+async function tick() {
+  const p = PARAMS, s = state;
+
+  // Step 1: Seal force
+  const [F_seal] = await execParallel([
+    { fn: 'seal_force', params: { k_seal: p.k_seal, delta: p.delta } }
+  ]);
+  s.F_seal = F_seal;
+
+  // Step 2: Cap pressure
+  const [P_cap] = await execParallel([
+    { fn: 'cap_pressure', params: { P_atm: p.P_atm, P_vac: p.P_vac } }
+  ]);
+  s.P_cap = P_cap;
+
+  // Step 3: Suction flow
+  const [Q_suction] = await execParallel([
+    { fn: 'suction_flow', params: { C_v: p.C_v, dP: s.P_cap, rho: p.rho_ink } }
+  ]);
+  s.Q_suction = Q_suction;
+
+  // Step 4: Extraction volume
+  const [V_ext] = await execParallel([
+    { fn: 'extraction_volume', params: { Q_suction: s.Q_suction, t_purge: p.t_purge } }
+  ]);
+  s.V_extracted = V_ext;
+
+  // Step 5: Wipe force
+  const [F_wipe] = await execParallel([
+    { fn: 'wipe_force', params: { mu_wipe: p.mu_wipe, P_contact: p.P_contact, A_blade: p.A_blade } }
+  ]);
+  s.F_wipe = F_wipe;
+
+  // Step 6: Streak count
+  const [streaks] = await execParallel([
+    { fn: 'streak_count', params: { F_wipe: s.F_wipe, F_optimal: p.F_optimal, k_streak: p.k_streak } }
+  ]);
+  s.streak_count = streaks;
+
+  // Step 7: Clog probability — advance time, simulate periodic capping
+  s.t_capped += DT;
+  if (s.t_capped > 60) {
+    s.purge_count++;
+    s.t_capped = 0;
+  }
+  const [P_clog] = await execParallel([
+    { fn: 'clog_probability', params: { P0: p.P0, t_capped: s.t_capped, tau: p.tau, purge_eff: p.purge_eff } }
+  ]);
+  s.P_clog = P_clog;
+
+  // Step 8: CRI — weighted sum across heads
+  const weights = [0.4, 0.3, 0.2, 0.1];
+  let sum_pw = 0;
+  for (let i = 0; i < p.num_heads; i++) {
+    sum_pw += s.P_clog * weights[i] * (1 + 0.1 * Math.sin(s.tickCount * 0.01 + i));
+  }
+  const [CRI] = await execParallel([
+    { fn: 'cri_index', params: { sum_plog_weighted: sum_pw } }
+  ]);
+  s.CRI = Math.min(1, CRI);
+
+  
+  // ── LAYER A-E: Energy Chain (Parallel) ──
+  if (typeof execParallel === 'function') {
+    const [resA, resB, resC, resD, resE] = await execParallel([
+      { fn: 'power_electronics', params: { V_line: p.V_line, I_load: s.I_motor || s.I_load || 0, R_bus: p.R_bus, V_input: s.V_input || 0, t_r: p.t_r, t_f: p.t_f, f_sw: p.f_sw, C_gate: p.C_gate, V_gs: p.V_gs } },
+      { fn: 'motor_electrical_adv', params: { K_e: p.K_e, omega: s.omega || 0, V_bus: 600, D: 0.5, f_sw: p.f_sw, L_motor: p.L_motor, V_input: s.V_input || 0, I_load: s.I_motor || s.I_load || 0, R_motor: p.R_motor, k_h: p.k_h, f_elec: p.f_elec, B_field: p.B_field, k_e: p.k_e } },
+      { fn: 'current_signature', params: { omega: s.omega || 0, T_load: s.T_load || p.T_load, K_t: p.K_t, efficiency: p.efficiency, N_teeth: p.N_teeth, N_balls: p.N_balls, d_ball: p.d_ball, D_pitch: p.D_pitch, alpha_contact: p.alpha_contact } },
+      { fn: 'mechanical_drive', params: { T_net: s.T_net || 0, L_shaft: p.L_shaft, G_shear: p.G_shear, J_polar: p.J_polar, F_belt: s.F_belt || 0, L_belt: p.L_belt, E_belt: p.E_belt, A_belt: p.A_belt, omega: s.omega || 0, eta_gear: p.eta_gear, mu_b: p.mu_b || 0.01, F_radial: p.F_radial, r_bearing: p.r_bearing, k_shaft: p.k_shaft, J_shaft: p.J_shaft } },
+      { fn: 'load_energy', params: { T_tension: s.T_tension || 0, L_span: p.L_span, E_fabric: p.E_fabric || 1e9, A_fabric: p.A_fabric || 0.001, F_nip: s.F_nip || 0, r_roller: p.r_roller || 0.1, w_fabric: p.w_fabric || 1, k_fabric: p.k_fabric, A_heat: p.A_heat, dT_dx: s.dT_dx || 0, r_nozzle: p.r_nozzle, gamma_ink: p.gamma_ink, C_piezo: p.C_piezo, V_drive: p.V_drive } }
+    ]);
+    s.I_env = resC.I_env;
+    s.delta_I = resB.delta_I;
+  }
+  if (s.fault_stall) s.I_env *= 2.5;
+  if (s.fault_overcurrent) s.I_env *= 1.5;
+  
+  if (typeof hist !== 'undefined' && hist.I_signature) {
+     hist.I_signature.push(s.I_env || 0); if (hist.I_signature.length > 300) hist.I_signature.shift();
+     if (typeof spark !== 'undefined' && spark.I_signature) { spark.I_signature.push(s.I_env || 0); if (spark.I_signature.length > 50) spark.I_signature.shift(); }
+  }
+
+  s.tickCount++;
+  s.simTime += DT;
+
+  pushHist(hist.CRI, s.CRI);
+  pushHist(hist.Q_suction, s.Q_suction);
+  pushHist(hist.P_cap, s.P_cap);
+  pushHist(hist.streak_count, s.streak_count);
+  pushSpark(spark.F_seal, s.F_seal);
+  pushSpark(spark.P_cap, s.P_cap);
+  pushSpark(spark.Q_suction, s.Q_suction);
+  pushSpark(spark.V_extracted, s.V_extracted);
+  pushSpark(spark.F_wipe, s.F_wipe);
+  pushSpark(spark.streak_count, s.streak_count);
+  pushSpark(spark.P_clog, s.P_clog);
+  pushSpark(spark.CRI, s.CRI);
+}
+
+function drawChart(canvasId, data, color, refLine, refColor) {
+  const canvas = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 6, right: 10, bottom: 20, left: 48 };
+  const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+
+  let dMin = Infinity, dMax = -Infinity;
+  for (const v of data) { if (v < dMin) dMin = v; if (v > dMax) dMax = v; }
+  if (!isFinite(dMin)) { dMin = 0; dMax = 1; }
+  if (dMin === dMax) { dMin -= 1; dMax += 1; }
+  const range = dMax - dMin;
+  dMin -= range * 0.1; dMax += range * 0.1;
+
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.08)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (i / 4) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    const val = dMax - (i / 4) * (dMax - dMin);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#6b7280';
+    ctx.font = '9px SF Mono, Menlo, monospace'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(val >= 100 ? 0 : val >= 1 ? 1 : 2), pad.left - 4, y + 3);
+  }
+
+  if (refLine !== undefined) {
+    const ry = pad.top + (1 - (refLine - dMin) / (dMax - dMin)) * ch;
+    ctx.strokeStyle = refColor || '#D85A30'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, ry); ctx.lineTo(pad.left + cw, ry); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (data.length < 2) return;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = pad.left + (i / (HIST_LEN - 1)) * cw;
+    const y = pad.top + (1 - (data[i] - dMin) / (dMax - dMin)) * ch;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function sparkSVG(data, color, w, h) {
+  if (data.length < 2) return '';
+  let lo = Infinity, hi = -Infinity;
+  for (const v of data) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const range = hi - lo || 1;
+  const pts = data.map((v, i) => `${(i/(data.length-1)*w).toFixed(1)},${(h-((v-lo)/range)*(h-2)-1).toFixed(1)}`);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+}
+
+const stateVars = [
+  { key:'F_seal', sym:'F_seal', name:'Seal Force', unit:'N', color:'#378ADD', warn:null, crit:null },
+  { key:'P_cap', sym:'P_cap', name:'Cap Pressure', unit:'Pa', color:'#378ADD', warn:null, crit:null },
+  { key:'Q_suction', sym:'Q', name:'Suction Flow', unit:'m³/s', color:'#BA7517', warn:null, crit:null },
+  { key:'V_extracted', sym:'V_ext', name:'Extracted Volume', unit:'m³', color:'#BA7517', warn:null, crit:null },
+  { key:'F_wipe', sym:'F_wipe', name:'Wipe Force', unit:'N', color:'#1D9E75', warn:null, crit:null },
+  { key:'streak_count', sym:'N_str', name:'Wipe Streaks', unit:'', color:'#1D9E75', warn:10, crit:25 },
+  { key:'P_clog', sym:'P_clog', name:'Clog Probability', unit:'', color:'#D85A30', warn:0.03, crit:0.05 },
+  { key:'CRI', sym:'CRI', name:'Clog Risk Index', unit:'', color:'#D85A30', warn:0.4, crit:0.7 },
+];
+
+function buildStateCards() {
+  document.getElementById('stateGrid').innerHTML = stateVars.map(sv =>
+    `<div class="state-card ok" id="sc_${sv.key}">
+      <div class="sc-left">
+        <div class="sc-sym">${sv.sym}</div>
+        <div class="sc-name">${sv.name}</div>
+        <div class="sc-val" id="scv_${sv.key}">—<span class="sc-unit">${sv.unit}</span></div>
+      </div>
+      <div class="sc-sparkline" id="sp_${sv.key}"></div>
+    </div>`
+  ).join('');
+}
+
+function updateStateCards() {
+  stateVars.forEach(sv => {
+    const val = state[sv.key];
+    const card = document.getElementById(`sc_${sv.key}`);
+    let status = 'ok';
+    if (sv.crit !== null && val > sv.crit) status = 'crit';
+    else if (sv.warn !== null && val > sv.warn) status = 'warn';
+    card.className = `state-card ${status}`;
+    document.getElementById(`scv_${sv.key}`).innerHTML = `${sigFig(val,4)}<span class="sc-unit">${sv.unit}</span>`;
+    document.getElementById(`sp_${sv.key}`).innerHTML = sparkSVG(spark[sv.key], sv.color, 64, 32);
+  });
+}
+
+function sigFig(n, sf) {
+  if (!Number.isFinite(n)) return '—';
+  if (n === 0) return '0';
+  return n.toFixed(Math.max(0, sf - 1 - Math.floor(Math.log10(Math.abs(n)))));
+}
+
+function updateSchematic() {
+  const s = state, p = PARAMS;
+  const capY = 100 + (1 - s.F_seal / (p.k_seal * p.delta + 1)) * 15;
+  document.getElementById('sch_cap').setAttribute('y', capY.toFixed(1));
+  document.getElementById('sch_cri_val').textContent = 'CRI = ' + s.CRI.toFixed(4);
+
+  const pumpR = 10 + s.Q_suction * 2000;
+  document.getElementById('sch_pump_indicator').setAttribute('r', Math.min(pumpR, 18).toFixed(1));
+
+  const wiperAngle = Math.min(s.streak_count / 30, 1) * 15;
+  const rad = wiperAngle * Math.PI / 180;
+  const bx = 180, by = 95, armLen = 60;
+  const ex = (bx - armLen * Math.cos(rad)).toFixed(1), ey = (by - armLen * Math.sin(rad)).toFixed(1);
+  document.getElementById('sch_wiper_arm').setAttribute('x1', ex);
+  document.getElementById('sch_wiper_arm').setAttribute('y1', ey);
+
+  const inkOp = 0.2 + s.P_clog * 5;
+  document.getElementById('sch_ink1').setAttribute('opacity', Math.min(inkOp, 0.8).toFixed(2));
+  document.getElementById('sch_ink2').setAttribute('opacity', Math.min(inkOp, 0.8).toFixed(2));
+  document.getElementById('sch_ink3').setAttribute('opacity', Math.min(inkOp, 0.8).toFixed(2));
+}
+
+function formatTime(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateTopBar() {
+  document.getElementById('simTime').textContent = formatTime(state.simTime);
+  const criPct = Math.min(100, (state.CRI / 1) * 100);
+  document.getElementById('criProgress').style.width = criPct.toFixed(1) + '%';
+  document.getElementById('criProgress').style.background = state.CRI > PARAMS.CRI_crit ? 'var(--red)' : state.CRI > PARAMS.CRI_warn ? 'var(--amber)' : 'var(--green)';
+  document.getElementById('criPct').textContent = criPct.toFixed(1) + '%';
+}
+
+function updateChartValues() {
+  document.getElementById('ct_CRI').textContent = state.CRI.toFixed(4);
+  document.getElementById('ct_Q').textContent = (state.Q_suction * 1e6).toFixed(2) + ' μL/s';
+  document.getElementById('ct_Pcap').textContent = (state.P_cap / 1000).toFixed(1) + ' kPa';
+  document.getElementById('ct_streak').textContent = state.streak_count.toFixed(0);
+}
+
+const btnPlay = document.getElementById('btnPlay');
+btnPlay.addEventListener('click', () => {
+  state.running = !state.running;
+  btnPlay.textContent = state.running ? '⏸ Pause' : '▶ Play';
+  btnPlay.classList.toggle('primary', !state.running);
+  btnPlay.classList.toggle('danger', state.running);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.running = false;
+  btnPlay.textContent = '▶ Play'; btnPlay.classList.add('primary'); btnPlay.classList.remove('danger');
+  state.F_seal = 0; state.P_cap = 0; state.Q_suction = 0; state.V_extracted = 0;
+  state.F_wipe = 0; state.streak_count = 0; state.P_clog = 0; state.CRI = 0;
+  state.t_capped = 0; state.purge_count = 0;
+  state.tickCount = 0; state.simTime = 0;
+  hist.CRI=[]; hist.Q_suction=[]; hist.P_cap=[]; hist.streak_count=[];
+  Object.keys(spark).forEach(k => spark[k]=[]);
+});
+
+document.querySelectorAll('.speed-group .btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-group .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); state.speed = parseInt(btn.dataset.speed);
+  });
+});
+
+document.getElementById('formulaToggle').addEventListener('click', () => {
+  const body = document.getElementById('formulaBody');
+  const arrow = document.getElementById('formulaArrow');
+  const open = body.classList.toggle('open');
+  arrow.classList.toggle('open', open);
+});
+
+function render() {
+
+  const sigCanvas = document.getElementById('chart_signature');
+  if (sigCanvas && typeof drawChart === 'function' && hist.I_signature) {
+     drawChart('chart_signature', hist.I_signature, '#BA7517');
+     const ct_I_sig = document.getElementById('ct_I_sig');
+     if (ct_I_sig) ct_I_sig.textContent = (state.I_env || 0).toFixed(2) + ' A';
+  }
+
+  drawChart('chart_cri', hist.CRI, '#D85A30', PARAMS.CRI_warn, '#BA7517');
+  drawChart('chart_suction', hist.Q_suction, '#BA7517');
+  drawChart('chart_pressure', hist.P_cap, '#378ADD');
+  drawChart('chart_streaks', hist.streak_count, '#1D9E75', 10, '#BA7517');
+  updateSchematic(); updateStateCards(); updateTopBar(); updateChartValues();
+}
+
+async function loop() {
+  if (state.running) {
+    for (let i = 0; i < state.speed; i++) {
+      await tick();
+    }
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+initWorkerPool();
+buildStateCards();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

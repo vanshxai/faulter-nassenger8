@@ -1,0 +1,577 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nassenger 8 — Digital Twin Dashboard</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-alt: #f7f8fa;
+  --text: #1a1d23;
+  --text-muted: #6b7280;
+  --border: #e2e5ea;
+  --accent: #378ADD;
+  --accent-soft: rgba(55,138,221,0.1);
+  --green: #1D9E75;
+  --amber: #BA7517;
+  --red: #D85A30;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-alt: #22252f;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border: #2d3040;
+    --accent: #5a9fef;
+    --accent-soft: rgba(90,159,239,0.12);
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.3);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.topbar {
+  padding: 16px 24px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.topbar h1 {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar h1 span {
+  color: var(--accent);
+  font-weight: 400;
+  margin-left: 6px;
+  font-size: 14px;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.container {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px 16px;
+}
+
+.section-title {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+/* ── River Flow Visual ── */
+.river-bar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-bottom: 32px;
+  overflow-x: auto;
+  padding: 4px 0;
+}
+
+.river-node {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+}
+
+.river-dot {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: #fff;
+  border: 2px solid var(--border);
+  position: relative;
+}
+
+.river-dot.active {
+  box-shadow: 0 0 0 3px rgba(55,138,221,0.2);
+}
+
+.river-dot .dot-label {
+  position: absolute;
+  bottom: -20px;
+  font-size: 9px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  font-weight: 500;
+  text-align: center;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.river-arrow {
+  width: 30px;
+  height: 2px;
+  background: var(--border);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.river-arrow::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: -4px;
+  border: 5px solid transparent;
+  border-left: 6px solid var(--border);
+}
+
+.river-arrow.active-flow {
+  background: var(--green);
+}
+
+.river-arrow.active-flow::after {
+  border-left-color: var(--green);
+  animation: pulse-arrow 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-arrow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Widget Grid ── */
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+  margin-bottom: 32px;
+}
+
+.widget-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.widget-card:hover {
+  box-shadow: var(--shadow-lg);
+  border-color: var(--accent);
+  transform: translateY(-2px);
+}
+
+.widget-card:active {
+  transform: translateY(0);
+}
+
+.widget-card .wc-accent {
+  height: 4px;
+  width: 100%;
+}
+
+.widget-card .wc-body {
+  padding: 16px;
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.widget-card .wc-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex-shrink: 0;
+  background: var(--accent-soft);
+}
+
+.widget-card .wc-info { flex: 1; min-width: 0; }
+
+.widget-card .wc-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+
+.widget-card .wc-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+.widget-card .wc-status {
+  padding: 0 16px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.widget-card .wc-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.widget-card .wc-badge.ready {
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+}
+
+.widget-card .wc-badge.running {
+  background: rgba(55,138,221,0.1);
+  color: var(--accent);
+}
+
+.widget-card .wc-open-icon {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* ── Coming Soon ── */
+.coming-soon {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+}
+
+.coming-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--surface-alt);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  opacity: 0.5;
+}
+
+.coming-item .ci-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.coming-item .ci-name {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+@media (max-width: 700px) {
+  .widget-grid, .coming-soon {
+    grid-template-columns: 1fr;
+  }
+  .topbar { padding: 12px 16px; }
+  .container { padding: 16px 12px; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <h1>Nassenger 8 <span>Digital Twin Engine</span></h1>
+    <div class="subtitle">Neuro-Symbolic Simulation Dashboard — Faulter Wireless</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- River Flow -->
+  <div class="section-title">Assembly River — Worker Flow</div>
+  <div class="river-bar" id="riverBar"></div>
+
+  <!-- Active Workers -->
+  <div class="section-title">Active Workers</div>
+  <div class="widget-grid" id="widgetGrid"></div>
+
+  <!-- Coming Soon -->
+  <div class="section-title">Workers In Queue</div>
+  <div class="coming-soon" id="comingSoon"></div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  WORKER DEFINITIONS
+// ═══════════════════════════════════════════════
+const WORKERS = [
+  {
+    id: 1,
+    name: 'Unwinder',
+    desc: 'Brake motor + dancer roller + tension sensor. Controls fabric roll geometry, web tension, and PID-based tension regulation.',
+    icon: '🧵',
+    color: '#378ADD',
+    file: 'worker1/worker1_unwinder.html',
+    formulas: 8,
+    stateVars: ['r(t)', 'ω(t)', 'T(t)', 'I(t)', 'T_m(t)'],
+    status: 'ready'
+  },
+  {
+    id: 2,
+    name: 'Fabric Feed/Advance',
+    desc: 'Servo motor + drive roller + pinch roller + encoder. Speed control with PID, encoder feedback, and banding error detection.',
+    icon: '⚙️',
+    color: '#1D9E75',
+    file: 'worker2_feed.html',
+    formulas: 8,
+    stateVars: ['v(t)', 'ω(t)', 'I_s(t)', 'θ(t)', 'd(t)'],
+    status: 'ready'
+  },
+  {
+    id: 3,
+    name: 'Fabric Tensioning',
+    desc: 'Dancer roller + spring actuator + PID feedback. Controls web tension via elastic model, dancer dynamics, and 1st-order actuator.',
+    icon: '📐',
+    color: '#BA7517',
+    file: 'worker3_tensioning.html',
+    formulas: 8,
+    stateVars: ['T(t)', 'x(t)', 'v_d(t)', 'F_s(t)', 'F_a(t)'],
+    status: 'ready'
+  },
+  {
+    id: 4,
+    name: 'Fabric Flattening',
+    desc: 'Spreader bar + edge guides + anti-curl rollers. Removes incoming curl, controls edge lateral offset, and enforces flatness via beam deflection.',
+    icon: '📏',
+    color: '#D85A30',
+    file: 'worker4_flattening.html',
+    formulas: 8,
+    stateVars: ['δ_f(t)', 'x_e(t)', 'M(t)', 'c_r(t)', 'F_s(t)'],
+    status: 'ready'
+  },
+  {
+    id: 5,
+    name: 'Carriage Scanning (X)',
+    desc: 'DC servo motor + timing belt + linear rail + encoder. Triangular scan trajectory, belt tension ratio, rail friction, and position PID control.',
+    icon: '↔️',
+    color: '#378ADD',
+    file: 'worker5_carriage.html',
+    formulas: 8,
+    stateVars: ['x(t)', 'v(t)', 'I(t)', 'ω(t)', 'F_b(t)'],
+    status: 'ready'
+  },
+  {
+    id: 6,
+    name: 'Printhead Array',
+    desc: '32× KM1024 heads · 32,768 nozzles · DoD piezoelectric · Oh/We/Z printability · drop ballistic · grayscale · clog tracking.',
+    icon: '🖨️',
+    color: '#1D9E75',
+    file: 'worker6_printhead.html',
+    formulas: 8,
+    stateVars: ['V_d(t)', 'Oh(t)', 'N_a(t)', 'H(t)', 'x_d(t)'],
+    status: 'ready'
+  },
+  {
+    id: 7,
+    name: 'Ink Supply ×8 Channels',
+    desc: '8-channel ink delivery with tank volume, pump pressure, and filter resistance. Manages manifold pressures, subtank levels, and channel balancing.',
+    icon: '💧',
+    color: '#BA7517',
+    file: 'worker7_inksupply.html',
+    formulas: 8,
+    stateVars: ['V_tank', 'Q_pump', 'dP_filter', 'V_sub', 'P_back', 'level_pct', 'dP_balance', 'flow_rate'],
+    status: 'ready'
+  },
+  {
+    id: 8,
+    name: 'Nozzle Health Monitor',
+    desc: 'Real-time nozzle status tracking using optical signal analysis. Detects dead, weak, and satellite nozzles with RIP compensation and health trend classification.',
+    icon: '🔍',
+    color: '#D85A30',
+    file: 'worker8_nozzlehealth.html',
+    formulas: 8,
+    stateVars: ['signal', 'contrast', 'dead_count', 'weak_count', 'health_pct', 'compensation_count', 'failure_rate', 'trend'],
+    status: 'ready'
+  },
+  {
+    id: 9,
+    name: 'Head Height Adjustment',
+    desc: 'Stepper-driven lead screw mechanism with PID control. Manages print head vertical position, gap measurement, and mechanical load compensation (gravity/friction).',
+    icon: '↕️',
+    color: '#378ADD',
+    file: 'worker9_headheight.html',
+    formulas: 8,
+    stateVars: ['h_current', 'v_vertical', 'T_stepper', 'F_axial', 'h_measured', 'height_error', 'PID_output', 'steps_remaining'],
+    status: 'ready'
+  },
+  {
+    id: 10,
+    name: 'Maintenance/Capping',
+    desc: 'Automated printhead preservation system. Features cap seal contact force modeling, vacuum-driven suction flow, wiper blade mechanics, and Clog Risk Index (CRI) tracking.',
+    icon: '🔧',
+    color: '#1D9E75',
+    file: 'worker10_maintenance.html',
+    formulas: 8,
+    stateVars: ['F_seal', 'P_cap', 'Q_suction', 'V_extracted', 'F_wipe', 'streak_count', 'P_clog', 'CRI'],
+    status: 'ready'
+  },
+  {
+    id: 11,
+    name: 'RIP/Image Processing',
+    desc: 'High-speed raster image processor for textile printing. Manages DPI scaling, ICC color transformation, Floyd-Steinberg halftoning, and real-time nozzle compensation mapping.',
+    icon: '🖥️',
+    color: '#BA7517',
+    file: 'worker11_rip.html',
+    formulas: 8,
+    stateVars: ['DPI_out', 'color_error', 'halftone_error', 'compensation_count', 'data_rate', 'buffer_pct', 'latency', 'throughput'],
+    status: 'ready'
+  },
+  {
+    id: 12,
+    name: 'Dryer',
+    desc: 'Industrial textile dryer with 3-phase heating and air knife technology. Models heat transfer, fabric temperature rise, Newton\'s law drying kinetics, and energy efficiency.',
+    icon: '🌡️',
+    color: '#D85A30',
+    file: 'worker12_dryer.html',
+    formulas: 8,
+    stateVars: ['P_heat', 'Q_transfer', 'T_fabric', 'moisture', 'drying_rate', 'F_air', 'E_total', 'efficiency'],
+    status: 'ready'
+  },
+  {
+    id: 13,
+    name: 'Rewinder/Winder',
+    desc: 'Constant-tension winding system for finished textile rolls. Features roll geometry expansion modeling, servo-driven torque control, dancer roller stabilization, and torque-speed margin tracking.',
+    icon: '🔄',
+    color: '#378ADD',
+    file: 'worker13_rewinder.html',
+    formulas: 8,
+    stateVars: ['r_roll', 'J_roll', 'T_cmd', 'T_motor', 'T_web', 'x_dancer', 'omega_winder', 'torque_margin'],
+    status: 'ready'
+  },
+{ id: 14, name: 'Belt Washing', desc: 'Water spray + rotating brush + air blade dryer. Cleans conveyor belt using spray impact, brush friction, and air blade drying.', icon: '🚿', color: '#1D9E75', file: 'worker14_beltwashing.html', formulas: 8, stateVars: ['Q_spray', 'Re', 'P_impact', 'T_brush', 'P_brush', 'eta_clean', 'cleanliness', 'moisture'], status: 'ready' },
+{ id: 15, name: 'Environmental Sensing', desc: 'Temp + humidity sensors + operator alerts. Monitors ambient conditions, validates operating envelope, triggers alerts.', icon: '🌡️', color: '#BA7517', file: 'worker15_environmental.html', formulas: 8, stateVars: ['T_amb', 'RH', 'dew_point', 'T_delta', 'RH_delta', 'alert_level', 'uptime', 'compliance'], status: 'ready' },
+{ id: 16, name: 'Central Control Panel', desc: 'WYSIWYG UI + job queue + all PID supervision. Master orchestrator, job scheduling, real-time monitoring, fault aggregation.', icon: '🎛️', color: '#D85A30', file: 'worker16_control.html', formulas: 8, stateVars: ['job_count', 'queue_depth', 'active_workers', 'fault_count', 'uptime', 'throughput', 'efficiency', 'status'], status: 'ready' }
+];
+
+// ═══════════════════════════════════════════════
+//  RIVER BAR
+// ═══════════════════════════════════════════════
+function buildRiver() {
+  const bar = document.getElementById('riverBar');
+  let html = '';
+  WORKERS.forEach((w, i) => {
+    const isActive = w.status === 'ready';
+    html += `<div class="river-node">
+      <div class="river-dot ${isActive ? 'active' : ''}" style="background:${isActive ? w.color : 'var(--border)'};">
+        ${w.id}
+        <div class="dot-label">${w.name.split(' ')[0]}</div>
+      </div>
+    </div>`;
+    if (i < WORKERS.length - 1) {
+      html += `<div class="river-arrow ${isActive ? 'active-flow' : ''}"></div>`;
+    }
+  });
+  bar.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════
+//  WIDGET GRID
+// ═══════════════════════════════════════════════
+function buildWidgets() {
+  const grid = document.getElementById('widgetGrid');
+  const active = WORKERS.filter(w => w.status === 'ready');
+
+  grid.innerHTML = active.map(w => `
+    <div class="widget-card" onclick="openWorker('${w.file}')">
+      <div class="wc-accent" style="background:${w.color}"></div>
+      <div class="wc-body">
+        <div class="wc-icon" style="color:${w.color}">${w.icon}</div>
+        <div class="wc-info">
+          <div class="wc-title">Worker ${w.id} — ${w.name}</div>
+          <div class="wc-desc">${w.desc}</div>
+        </div>
+      </div>
+      <div class="wc-status">
+        <div class="wc-badge ready">${w.formulas} formulas · ${w.stateVars.length} state vars</div>
+        <span class="wc-open-icon">↗</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function buildComingSoon() {
+  const cs = document.getElementById('comingSoon');
+  const queued = WORKERS.filter(w => w.status === 'queued');
+  cs.innerHTML = queued.map(w => `
+    <div class="coming-item">
+      <div class="ci-num">${w.id}</div>
+      <div class="ci-name">${w.icon}  Worker ${w.id} — ${w.name}</div>
+    </div>
+  `).join('');
+}
+
+// ═══════════════════════════════════════════════
+//  OPEN WORKER
+// ═══════════════════════════════════════════════
+function openWorker(file) {
+  const path = window.location.pathname.replace(/\/[^/]+$/, '/');
+  const url = path + file;
+  window.open(url, '_blank');
+}
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+buildRiver();
+buildWidgets();
+buildComingSoon();
+</script>
+</body>
+</html>

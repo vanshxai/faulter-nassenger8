@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker 1 — Unwinder | Nassenger 8 Digital Twin</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-alt: #f7f8fa;
+  --text: #1a1d23;
+  --text-muted: #6b7280;
+  --border: #e2e5ea;
+  --accent: #378ADD;
+  --accent-soft: rgba(55,138,221,0.1);
+  --green: #1D9E75;
+  --amber: #BA7517;
+  --red: #D85A30;
+  --chart-grid: rgba(0,0,0,0.08);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-alt: #22252f;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border: #2d3040;
+    --accent: #5a9fef;
+    --accent-soft: rgba(90,159,239,0.12);
+    --chart-grid: rgba(255,255,255,0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.3);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar h1 span {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.sim-time {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn:hover { background: var(--surface-alt); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.9; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: var(--red); color: #fff; }
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.speed-group {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.speed-group .btn {
+  border: none;
+  border-radius: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.speed-group .btn + .btn { border-left: 1px solid var(--border); }
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.progress-bar {
+  width: 100px;
+  height: 6px;
+  background: var(--surface-alt);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.main {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  min-height: calc(100vh - 52px);
+  align-items: flex-start;
+}
+
+.col-left, .col-right {
+  flex: 0 0 280px;
+  min-width: 0;
+}
+
+.col-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.card-body { padding: 12px 14px; }
+
+.slider-group { margin-bottom: 10px; }
+.slider-group:last-child { margin-bottom: 0; }
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.slider-label .name { color: var(--text); font-weight: 500; }
+.slider-label .val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.state-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.state-card.ok { border-color: var(--green); }
+.state-card.warn { border-color: var(--amber); background: rgba(186,117,23,0.06); }
+.state-card.crit { border-color: var(--red); background: rgba(216,90,48,0.06); }
+
+.state-card .sc-left { min-width: 0; }
+.state-card .sc-sym {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.state-card .sc-name { font-size: 11px; color: var(--text-muted); }
+.state-card .sc-val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.state-card .sc-unit { font-size: 10px; color: var(--text-muted); margin-left: 2px; font-weight: 400; }
+.state-card .sc-sparkline { width: 64px; height: 32px; flex-shrink: 0; }
+
+.schematic-wrap { padding: 12px; display: flex; justify-content: center; }
+.schematic-wrap svg { max-width: 100%; height: auto; }
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.chart-title {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+.chart-title .ct-value {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chart-canvas-wrap { padding: 6px 8px 8px; position: relative; }
+.chart-canvas-wrap canvas { width: 100%; display: block; }
+
+/* ── Parallel Execution Indicator ── */
+.parallel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  margin-left: 8px;
+}
+
+/* ── Formula Chain ── */
+.formula-chain-toggle {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.formula-chain-toggle .arrow { transition: transform 0.2s ease; font-size: 10px; }
+.formula-chain-toggle .arrow.open { transform: rotate(90deg); }
+
+.formula-chain-body {
+  display: none;
+  padding: 0 14px 14px;
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", monospace;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.formula-chain-body.open { display: block; }
+
+.formula-step {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.formula-step:last-child { border-bottom: none; }
+
+.formula-step .step-num { font-weight: 700; color: var(--accent); margin-right: 6px; }
+
+.formula-step .step-title {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+}
+
+.formula-step .step-eq { color: var(--accent); font-size: 11px; }
+
+.formula-step .parallel-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.formula-step .sequential-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(55,138,221,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(55,138,221,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+
+@media (max-width: 900px) {
+  .main { flex-direction: column; }
+  .col-left, .col-right { flex: none; width: 100%; }
+  .charts-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════ TOP BAR ═══════ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Worker 1 — Unwinder<span>Nassenger 8 Digital Twin</span></h1>
+    <div class="sim-time" id="simTime">00:00:00</div>
+    <button class="btn primary" id="btnPlay">▶ Play</button>
+    <button class="btn" id="btnReset">↺ Reset</button>
+    <div class="speed-group">
+      <button class="btn active" data-speed="1">1×</button>
+      <button class="btn" data-speed="5">5×</button>
+      <button class="btn" data-speed="10">10×</button>
+      <button class="btn" data-speed="50">50×</button>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <span>Roll:</span>
+    <div class="progress-bar"><div class="progress-fill" id="rollProgress"></div></div>
+    <span id="rollPct">100%</span>
+  </div>
+</div>
+
+<!-- ═══════ MAIN ═══════ -->
+<div class="main">
+
+  <!-- ── LEFT: Parameters ── -->
+  <div class="col-left">
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Roll Geometry</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Max Radius</span><span class="val" id="v_r_max">0.300 m</span></div>
+          <input type="range" id="s_r_max" min="0.15" max="0.50" step="0.001" value="0.30">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Fabric Density</span><span class="val" id="v_rho_fabric">0.300 kg/m²</span></div>
+          <input type="range" id="s_rho_fabric" min="0.1" max="1.0" step="0.001" value="0.3">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Fabric Width</span><span class="val" id="v_w_fabric">1.850 m</span></div>
+          <input type="range" id="s_w_fabric" min="0.5" max="3.0" step="0.001" value="1.85">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Motor</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Resistance</span><span class="val" id="v_R_motor">2.500 Ω</span></div>
+          <input type="range" id="s_R_motor" min="0.5" max="10" step="0.01" value="2.5">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Torque Constant</span><span class="val" id="v_K_t">0.800 N·m/A</span></div>
+          <input type="range" id="s_K_t" min="0.1" max="2.0" step="0.01" value="0.8">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Back-EMF Const</span><span class="val" id="v_K_e">0.800 V·s/rad</span></div>
+          <input type="range" id="s_K_e" min="0.1" max="2.0" step="0.01" value="0.8">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Max Voltage</span><span class="val" id="v_V_max">48.0 V</span></div>
+          <input type="range" id="s_V_max" min="12" max="96" step="1" value="48">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Tension</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Target Tension</span><span class="val" id="v_T_setpoint">50.0 N</span></div>
+          <input type="range" id="s_T_setpoint" min="10" max="150" step="0.5" value="50">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Downstream Speed</span><span class="val" id="v_v_downstream">0.500 m/s</span></div>
+          <input type="range" id="s_v_downstream" min="0.1" max="2.0" step="0.01" value="0.5">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Dancer Spring</span><span class="val" id="v_k_spring">500.0 N/m</span></div>
+          <input type="range" id="s_k_spring" min="100" max="2000" step="10" value="500">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">PID</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Kp</span><span class="val" id="v_Kp">2.000</span></div>
+          <input type="range" id="s_Kp" min="0" max="20" step="0.01" value="2.0">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Ki</span><span class="val" id="v_Ki">0.500</span></div>
+          <input type="range" id="s_Ki" min="0" max="5" step="0.01" value="0.5">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Kd</span><span class="val" id="v_Kd">0.100</span></div>
+          <input type="range" id="s_Kd" min="0" max="2" step="0.001" value="0.1">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Thermal</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Ambient Temp</span><span class="val" id="v_T_amb">28.0 °C</span></div>
+          <input type="range" id="s_T_amb" min="15" max="45" step="0.5" value="28">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Thermal Resistance</span><span class="val" id="v_R_th">2.500 °C/W</span></div>
+          <input type="range" id="s_R_th" min="0.5" max="10" step="0.1" value="2.5">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── CENTER: Visualisation ── -->
+  <div class="col-center">
+
+    <!-- Schematic -->
+    <div class="card">
+      <div class="card-header">Schematic — Worker 1 Unwinder</div>
+      <div class="schematic-wrap">
+        <svg id="schematic" viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--chart-grid)" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="600" height="240" fill="url(#grid)" opacity="0.4"/>
+
+          <circle id="sch_roll" cx="140" cy="130" r="70" fill="none" stroke="var(--accent)" stroke-width="2.5"/>
+          <circle id="sch_core" cx="140" cy="130" r="12" fill="var(--border)" stroke="var(--text-muted)" stroke-width="1"/>
+          <circle cx="140" cy="130" r="3" fill="var(--accent)"/>
+
+          <line x1="140" y1="60" x2="340" y2="60" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="6,4"/>
+
+          <circle cx="370" cy="60" r="18" fill="none" stroke="var(--green)" stroke-width="2"/>
+          <circle cx="370" cy="60" r="4" fill="var(--green)"/>
+
+          <g id="sch_dancer_group">
+            <line x1="420" y1="60" x2="460" y2="100" stroke="var(--amber)" stroke-width="2" id="sch_dancer_arm"/>
+            <circle cx="460" cy="100" r="8" fill="none" stroke="var(--amber)" stroke-width="1.5" id="sch_dancer_wheel"/>
+          </g>
+
+          <rect x="400" y="52" width="14" height="16" rx="2" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1"/>
+          <text x="407" y="64" font-size="7" text-anchor="middle" fill="var(--accent)" font-weight="700">T</text>
+
+          <polygon points="280,55 295,60 280,65" fill="var(--green)" opacity="0.6"/>
+          <text x="288" y="48" font-size="9" fill="var(--green)" text-anchor="middle" font-weight="600">Fabric →</text>
+
+          <text x="140" y="210" font-size="10" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Fabric Roll</text>
+          <text x="370" y="95" font-size="9" fill="var(--green)" text-anchor="middle" font-weight="600">Drive Roller</text>
+          <text x="460" y="120" font-size="9" fill="var(--amber)" text-anchor="middle" font-weight="600">Dancer</text>
+          <text x="407" y="44" font-size="8" fill="var(--accent)" text-anchor="middle" font-weight="600">Tension Sensor</text>
+          <text x="140" y="230" font-size="8" fill="var(--text-muted)" text-anchor="middle">Brake Motor + PID Controller</text>
+          <text id="sch_r_val" x="140" y="134" font-size="9" fill="var(--text)" text-anchor="middle" font-weight="600" font-family="SF Mono, Menlo, monospace"></text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-title">Current Signature i(t) <span class="ct-value" id="ct_I_sig" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_signature" height="130"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Web Tension <span class="ct-value" id="ct_T" style="color:#378ADD">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_tension" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Roll Radius <span class="ct-value" id="ct_r" style="color:#1D9E75">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_radius" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Motor Current <span class="ct-value" id="ct_I" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_current" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Motor Temperature <span class="ct-value" id="ct_Tm" style="color:#D85A30">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_temp" height="130"></canvas></div>
+      </div>
+    </div>
+
+    <!-- DAG Control Panel -->
+    <div class="card">
+      <div class="formula-chain-toggle" id="dagToggle" onclick="window.open('dag_control.html', '_blank')">
+        <span>DAG Control Panel (11 levels, 20 formulas) <span class="parallel-badge">⚡ Open in New Tab</span></span>
+        <span class="arrow" style="transform: rotate(-45deg)">↗</span>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── RIGHT: State Readouts ── -->
+  <div class="col-right">
+
+    <div class="card" style="margin-top:10px;">
+      <div class="card-header">Energy Fault Injection</div>
+      <div class="card-body" style="padding:10px; display:flex; gap:10px;">
+        <label style="font-size:11px;"><input type="checkbox" id="chk_stall"> Stall (I > 2.5x)</label>
+        <label style="font-size:11px;"><input type="checkbox" id="chk_overcurrent"> Overcurrent (1.5x)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Live State Variables</div>
+      <div class="card-body">
+        <div class="state-grid" id="stateGrid"></div>
+      </div>
+    </div>
+  </div>
+
+
+    <div class="card" style="margin-top:10px;">
+      <div class="card-header">Mechanical Fault Injection</div>
+      <div class="card-body" style="padding:10px;">
+        <label style="font-size:11px;"><input type="checkbox" id="chk_backlash"> Worn Gearbox (Backlash = 0.01 rad)</label>
+      </div>
+    </div>
+  </div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  WORKER THREAD — Formula Executor
+//  Runs formulas in parallel via Web Workers
+// ═══════════════════════════════════════════════
+const WORKER_CODE = `
+self.onmessage = function(e) {
+  const { id, fn, params } = e.data;
+  let result;
+  const p = params;
+  switch(fn) {
+    case 'roll_radius':
+      result = p.r_prev - (p.v_fabric * p.dt) / (2 * Math.PI * p.r_prev);
+      if (result < p.r_min) result = p.r_min;
+      break;
+    case 'roll_mass':
+      result = p.m_core + p.rho_fabric * Math.PI * (p.r * p.r - p.r_core * p.r_core) * p.w_fabric;
+      break;
+    case 'motor_resistance':
+      result = p.R_20 * (1 + p.alpha_cu * (p.T_motor - 20));
+      break;
+    case 'roll_inertia':
+      result = 0.5 * p.m_roll * p.r * p.r;
+      break;
+    case 'motor_di_dt':
+      result = (p.V_input - p.I_motor * p.R_motor_T - p.K_e * p.omega) / p.L_motor;
+      break;
+    case 'motor_torque_raw':
+      result = p.K_t * p.I_motor;
+      break;
+    case 'friction_torque':
+      result = p.mu_bearing * p.m_roll * p.g * p.r_shaft;
+      break;
+    case 'cogging_torque':
+      result = p.T_cog_peak * Math.sin(p.N_slots * p.theta_rotor);
+      break;
+    case 'viscous_drag':
+      result = p.B_visc * p.omega;
+      break;
+    case 'gear_loss':
+      result = Math.abs(p.T_motor_raw) * (1 - p.eta_gear);
+      break;
+    case 'dynamic_flux':
+      let mu_0 = 4 * Math.PI * 1e-7;
+      let I_mag = p.I_motor * Math.sin(p.phi_lag);
+      let B_calc = (mu_0 * p.mu_r * p.N_turns * Math.abs(I_mag)) / (2 * p.l_gap);
+      result = Math.min(B_calc, p.B_sat);
+      break;
+    case 'core_loss':
+      result = (p.k_h * Math.abs(p.omega) + p.k_e * p.omega * p.omega) * p.B_pk * p.B_pk * p.Vol_core;
+      break;
+    case 'backlash_transmission':
+      let theta_err = p.theta_output - p.theta_input / p.gear_ratio;
+      if (Math.abs(theta_err) < p.backlash / 2) {
+        result = 0;
+      } else {
+        result = p.k_shaft * (Math.abs(theta_err) - p.backlash / 2) * Math.sign(theta_err);
+      }
+      break;
+    case 'copper_loss':
+      result = p.I_motor * p.I_motor * p.R_motor_T;
+      break;
+    case 'temp_rate':
+      result = (p.P_cu + p.P_core - (p.T_motor - p.T_amb) / p.R_th) / p.C_th;
+      break;
+    case 'alpha':
+      result = p.J > 1e-12 ? p.T_net / p.J : 0;
+      break;
+    case 'omega_update':
+      result = p.omega_prev + p.alpha * p.dt;
+      if (result < 0) result = 0;
+      break;
+    case 'motor_temp':
+      result = p.T_motor_prev + p.dT_dt * p.dt;
+      break;
+    case 'fabric_slip_stribeck':
+      let mu_eff = p.mu_s * Math.exp(-p.k_dec * Math.abs(p.v_slip_prev)) + p.mu_k * (1 - Math.exp(-p.k_dec * Math.abs(p.v_slip_prev)));
+      let F_normal = p.m_roll * p.g;
+      let F_adhesion = mu_eff * F_normal;
+      if (p.T_tension <= F_adhesion) {
+        result = 0;
+      } else if (p.T_tension <= F_adhesion * p.slip_ratio) {
+        result = p.k_micro * (p.T_tension - F_adhesion);
+      } else {
+        result = p.v_roller - p.v_fabric_free;
+      }
+      break;
+    case 'web_tension':
+      result = p.E_fabric * p.A_fabric * (p.v_downstream - p.v_fabric) / (p.v_nominal > 0.001 ? p.v_nominal : 0.001) + p.T_0;
+      break;
+    case 'dancer_cyl_force':
+      result = p.P_supply * p.A_cyl * (p.V_dead / (p.V_dead + p.A_cyl * p.x_dancer));
+      break;
+    case 'dancer_seal_fric':
+      result = p.F_c + p.B_v * p.v_dancer + p.F_s * Math.exp(-Math.abs(p.v_dancer) / p.v_s) * Math.sign(p.v_dancer);
+      break;
+    case 'pid_integral':
+      result = p.integral_prev + p.e * p.dt;
+      if (result > 1000) result = 1000;
+      if (result < -1000) result = -1000;
+      break;
+    case 'pid_derivative':
+      result = p.dt !== 0 ? (p.e - p.e_prev) / p.dt : 0;
+      break;
+    case 'dancer_position':
+      result = (p.T_tension - p.F_cyl - p.F_seal) / p.k_spring;
+      break;
+    case 'pid_output':
+      result = p.Kp * p.e + p.Ki * p.integral + p.Kd * p.derivative;
+      break;
+    case 'dancer_velocity':
+      result = (p.x_dancer_new - p.x_dancer_prev) / p.dt;
+      break;
+    case 'clamp_voltage':
+      result = Math.max(p.V_min, Math.min(p.V_max, p.u));
+      break;
+    default:
+      result = NaN;
+  }
+  self.postMessage({ id, result });
+};
+`;
+
+// ── Worker Pool ──
+const WORKER_POOL_SIZE = 4;
+const workerPool = [];
+const workerQueue = [];
+let workerIdCounter = 0;
+
+function createWorker() {
+  const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  const worker = new Worker(url);
+  worker.busy = false;
+  worker.pending = null;
+  URL.revokeObjectURL(url); // worker keeps its copy
+  return worker;
+}
+
+function initWorkerPool() {
+  for (let i = 0; i < WORKER_POOL_SIZE; i++) {
+    const w = createWorker();
+    w.onmessage = function(e) {
+      w.busy = false;
+      if (w.pending) {
+        const { resolve } = w.pending;
+        w.pending = null;
+        resolve(e.data.result);
+      }
+      drainWorkerQueue(w);
+    };
+    workerPool.push(w);
+  }
+}
+
+function drainWorkerQueue(worker) {
+  if (workerQueue.length === 0) return;
+  const task = workerQueue.shift();
+  worker.busy = true;
+  worker.postMessage({ id: task.id, fn: task.fn, params: task.params });
+}
+
+function execFormula(fn, params) {
+  return new Promise(resolve => {
+    const idle = workerPool.find(w => !w.busy);
+    if (idle) {
+      idle.busy = true;
+      idle.onmessage = function(e) {
+        idle.busy = false;
+        resolve(e.data.result);
+        drainWorkerQueue(idle);
+      };
+      idle.postMessage({ id: workerIdCounter++, fn, params });
+    } else {
+      workerQueue.push({ id: workerIdCounter++, fn, params, resolve });
+    }
+  });
+}
+
+async function execParallel(formulas) {
+  return Promise.all(formulas.map(f => execFormula(f.fn, f.params)));
+}
+
+// ═══════════════════════════════════════════════
+//  PARAMETERS
+// ═══════════════════════════════════════════════
+const PARAMS = {
+  // Motor Windings (Temp Dependency)
+  alpha_cu: 0.00393, R_20: 1.5,
+  // Motor Core (Hysteresis, Eddy, Dynamic Flux)
+  k_h: 0.02, k_e: 0.001, Vol_core: 0.005,
+  phi_lag: 0.2, mu_r: 1500, N_turns: 120, l_gap: 0.001, B_sat: 1.8,
+  // Motor Core (Cogging)
+  T_cog_peak: 0.5, N_slots: 12,
+  // Gearbox (Viscous, Mesh Loss, Backlash)
+  B_visc: 0.05, eta_gear: 0.98, backlash: 0.002, k_shaft: 5000, gear_ratio: 1.0,
+  // Fabric Roller Interface (Stribeck Slip)
+  mu_s: 0.35, mu_k: 0.25, k_dec: 50.0, slip_ratio: 1.5, k_micro: 0.001,
+  // Dancer Hydraulic/Pneumatic (Dead volume & Stribeck)
+  P_supply: 500000, A_cyl: 0.002, V_dead: 0.0005,
+  F_c: 10, B_v: 50, F_s: 25, v_s: 0.01,
+
+  // Standard Parameters
+  r_max: 0.30, r_core: 0.05, r_min: 0.051,
+  w_fabric: 1.85, rho_fabric: 0.3, m_core: 2.0,
+  L_motor: 0.015, K_t: 0.8, K_e: 0.8,
+  V_max: 48, V_min: 0,
+  mu_bearing: 0.002, r_shaft: 0.025,
+  E_fabric: 50000, A_fabric: 0.001, T_0: 20,
+  T_setpoint: 50, v_downstream: 0.5, v_nominal: 0.5,
+  k_spring: 500, Kp: 2.0, Ki: 0.5, Kd: 0.1,
+  R_th: 2.5, C_th: 50, T_amb: 28,
+};
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const state = {
+  r: PARAMS.r_max, omega: 0, v_fabric: 0, theta_rotor: 0, theta_output: 0,
+  v_slip: 0, B_pk: 0, T_transmitted: 0,
+  T_tension: PARAMS.T_0,
+  x_dancer: PARAMS.T_0 / PARAMS.k_spring, v_dancer: 0,
+  I_motor: 0, T_motor: PARAMS.T_amb,
+  J: 0.5 * (PARAMS.m_core + PARAMS.rho_fabric * Math.PI * (PARAMS.r_max**2 - PARAMS.r_core**2) * PARAMS.w_fabric) * PARAMS.r_max**2,
+  V_input: 20, e_prev: 0, integral: 0,
+  tickCount: 0, simTime: 0, running: false, speed: 1,
+};
+
+const g = 9.81;
+const DT = 0.01;
+
+// ═══════════════════════════════════════════════
+//  HISTORY
+// ═══════════════════════════════════════════════
+const HIST_LEN = 300, SPARK_LEN = 50;
+const hist = { T_tension: [], r: [], I_motor: [], T_motor: [] };
+const spark = { r:[], omega:[], v_fabric:[], T_tension:[], x_dancer:[], I_motor:[], T_motor:[], J:[] };
+
+function pushHist(arr, val) { arr.push(val); if (arr.length > HIST_LEN) arr.shift(); }
+function pushSpark(arr, val) { arr.push(val); if (arr.length > SPARK_LEN) arr.shift(); }
+
+// ═══════════════════════════════════════════════
+//  SLIDERS
+// ═══════════════════════════════════════════════
+const sliderMap = [
+  { id:'s_r_max', key:'r_max', fmt:v=>v.toFixed(3)+' m', d:'v_r_max' },
+  { id:'s_rho_fabric', key:'rho_fabric', fmt:v=>v.toFixed(3)+' kg/m²', d:'v_rho_fabric' },
+  { id:'s_w_fabric', key:'w_fabric', fmt:v=>v.toFixed(3)+' m', d:'v_w_fabric' },
+  { id:'s_K_t', key:'K_t', fmt:v=>v.toFixed(3)+' N·m/A', d:'v_K_t' },
+  { id:'s_K_e', key:'K_e', fmt:v=>v.toFixed(3)+' V·s/rad', d:'v_K_e' },
+  { id:'s_V_max', key:'V_max', fmt:v=>v.toFixed(1)+' V', d:'v_V_max' },
+  { id:'s_T_setpoint', key:'T_setpoint', fmt:v=>v.toFixed(1)+' N', d:'v_T_setpoint' },
+  { id:'s_v_downstream', key:'v_downstream', fmt:v=>v.toFixed(3)+' m/s', d:'v_v_downstream' },
+  { id:'s_k_spring', key:'k_spring', fmt:v=>v.toFixed(1)+' N/m', d:'v_k_spring' },
+  { id:'s_Kp', key:'Kp', fmt:v=>v.toFixed(3), d:'v_Kp' },
+  { id:'s_Ki', key:'Ki', fmt:v=>v.toFixed(3), d:'v_Ki' },
+  { id:'s_Kd', key:'Kd', fmt:v=>v.toFixed(3), d:'v_Kd' },
+  { id:'s_T_amb', key:'T_amb', fmt:v=>v.toFixed(1)+' °C', d:'v_T_amb' },
+  { id:'s_R_th', key:'R_th', fmt:v=>v.toFixed(3)+' °C/W', d:'v_R_th' },
+];
+
+sliderMap.forEach(s => {
+  const el = document.getElementById(s.id);
+  const disp = document.getElementById(s.d);
+  if(el) {
+    el.value = PARAMS[s.key];
+    if(disp) disp.textContent = s.fmt(PARAMS[s.key]);
+    el.addEventListener('input', () => { PARAMS[s.key] = parseFloat(el.value); if(disp) disp.textContent = s.fmt(PARAMS[s.key]); });
+  }
+});
+
+// ═══════════════════════════════════════════════
+//  FORMULA DAG
+// ═══════════════════════════════════════════════
+//  DEPENDENCY GRAPH:
+//  ┌─────────────────────────────────────────────────────────────┐
+//  │ L1  roll_radius ─┐   roll_mass ─┐   motor_resistance ──┐    │
+//  │                  ├─ L2 ─────────┤                      │    │
+//  │                  │ roll_inertia │   motor_di_dt        │    │
+//  │                  │      │       │        │             │    │
+//  │ L3               │      │  motor_torque_raw friction cogging│
+//  │                  │      │  viscous_drag dynamic_flux        │
+//  │                  │      │       │    │       │             │
+//  │ L4               │      │  gear_loss core_loss copper_loss  │
+//  │                  │      │  backlash_transmission           │
+//  │ L5               │   temp_rate  alpha                      │
+//  │ L6               │   omega_update motor_temp               │
+//  │ L7               │   fabric_slip_stribeck                  │
+//  │ L8               │   web_tension                           │
+//  │ L9               │   dancer_cyl_force dancer_seal_fric     │
+//  │                  │   pid_integral  pid_derivative          │
+//  │ L10              │   dancer_position pid_output            │
+//  │ L11              │   dancer_velocity clamp_voltage         │
+//  └─────────────────────────────────────────────────────────────┘
+
+function buildFormulaDAG(p, s) {
+  return [
+    [
+      { out: 'r_new', fn: 'roll_radius', params: { r_prev: s.r, v_fabric: s.v_fabric, dt: DT, r_min: p.r_min } },
+      { out: 'm_roll', fn: 'roll_mass', params: { m_core: p.m_core, rho_fabric: p.rho_fabric, r: s.r, r_core: p.r_core, w_fabric: p.w_fabric } },
+      { out: 'R_motor_T', fn: 'motor_resistance', params: { R_20: p.R_20, alpha_cu: p.alpha_cu, T_motor: s.T_motor } }
+    ],
+    [
+      { out: 'J', fn: 'roll_inertia', params: '_deferred_' },
+      { out: 'di_dt', fn: 'motor_di_dt', params: '_deferred_' }
+    ],
+    [
+      { out: 'T_motor_raw', fn: 'motor_torque_raw', params: '_deferred_' },
+      { out: 'T_fric', fn: 'friction_torque', params: '_deferred_' },
+      { out: 'T_cog', fn: 'cogging_torque', params: '_deferred_' },
+      { out: 'T_visc', fn: 'viscous_drag', params: '_deferred_' },
+      { out: 'B_pk', fn: 'dynamic_flux', params: '_deferred_' }
+    ],
+    [
+      { out: 'T_gear_loss', fn: 'gear_loss', params: '_deferred_' },
+      { out: 'P_core', fn: 'core_loss', params: '_deferred_' },
+      { out: 'P_cu', fn: 'copper_loss', params: '_deferred_' },
+      { out: 'T_transmitted', fn: 'backlash_transmission', params: '_deferred_' }
+    ],
+    [
+      { out: 'dT_dt', fn: 'temp_rate', params: '_deferred_' },
+      { out: 'alpha_val', fn: 'alpha', params: '_deferred_' }
+    ],
+    [
+      { out: 'omega_new', fn: 'omega_update', params: '_deferred_' },
+      { out: 'T_motor_new', fn: 'motor_temp', params: '_deferred_' }
+    ],
+    [
+      { out: 'v_slip', fn: 'fabric_slip_stribeck', params: '_deferred_' }
+    ],
+    [
+      { out: 'T_tension_new', fn: 'web_tension', params: '_deferred_' }
+    ],
+    [
+      { out: 'F_cyl', fn: 'dancer_cyl_force', params: '_deferred_' },
+      { out: 'F_seal', fn: 'dancer_seal_fric', params: '_deferred_' },
+      { out: 'integral_new', fn: 'pid_integral', params: '_deferred_' },
+      { out: 'derivative', fn: 'pid_derivative', params: '_deferred_' }
+    ],
+    [
+      { out: 'x_dancer_new', fn: 'dancer_position', params: '_deferred_' },
+      { out: 'u', fn: 'pid_output', params: '_deferred_' }
+    ],
+    [
+      { out: 'v_dancer_new', fn: 'dancer_velocity', params: '_deferred_' },
+      { out: 'V_input_new', fn: 'clamp_voltage', params: '_deferred_' }
+    ]
+  ];
+}
+
+function resolveParams(formula, R, p, s) {
+  switch (formula.fn) {
+    case 'roll_inertia': return { m_roll: R.m_roll, r: R.r_new };
+    case 'motor_di_dt': return { V_input: s.V_input, I_motor: s.I_motor, R_motor_T: R.R_motor_T, K_e: p.K_e, omega: s.omega, L_motor: p.L_motor };
+    case 'motor_torque_raw': return { K_t: p.K_t, I_motor: R.I_motor_new };
+    case 'friction_torque': return { mu_bearing: p.mu_bearing, m_roll: R.m_roll, g, r_shaft: p.r_shaft };
+    case 'cogging_torque': return { T_cog_peak: p.T_cog_peak, N_slots: p.N_slots, theta_rotor: R.theta_rotor_new };
+    case 'viscous_drag': return { B_visc: p.B_visc, omega: s.omega };
+    case 'gear_loss': return { T_motor_raw: R.T_motor_raw, eta_gear: p.eta_gear };
+    case 'dynamic_flux': return { I_motor: R.I_motor_new, phi_lag: p.phi_lag, mu_r: p.mu_r, N_turns: p.N_turns, l_gap: p.l_gap, B_sat: p.B_sat };
+    case 'core_loss': return { k_h: p.k_h, k_e: p.k_e, omega: s.omega, B_pk: R.B_pk, Vol_core: p.Vol_core };
+    case 'backlash_transmission': return { theta_output: s.theta_output + s.omega * DT, theta_input: R.theta_rotor_new, gear_ratio: p.gear_ratio, backlash: p.backlash, k_shaft: p.k_shaft };
+    case 'copper_loss': return { I_motor: R.I_motor_new, R_motor_T: R.R_motor_T };
+    case 'temp_rate': return { P_cu: R.P_cu, P_core: R.P_core, T_motor: s.T_motor, T_amb: p.T_amb, R_th: p.R_th, C_th: p.C_th };
+    case 'alpha': return { J: R.J, T_net: R.T_net };
+    case 'omega_update': return { omega_prev: s.omega, alpha: R.alpha_val, dt: DT };
+    case 'motor_temp': return { T_motor_prev: s.T_motor, dT_dt: R.dT_dt, dt: DT };
+    case 'fabric_slip_stribeck': return { T_tension: s.T_tension, v_slip_prev: s.v_slip, m_roll: R.m_roll, g: g, mu_s: p.mu_s, mu_k: p.mu_k, k_dec: p.k_dec, slip_ratio: p.slip_ratio, k_micro: p.k_micro, v_roller: R.v_roller, v_fabric_free: s.v_fabric };
+    case 'web_tension': return { E_fabric: p.E_fabric, A_fabric: p.A_fabric, v_downstream: p.v_downstream, v_fabric: R.v_fabric, v_nominal: p.v_nominal, T_0: p.T_0 };
+    case 'dancer_cyl_force': return { P_supply: p.P_supply, A_cyl: p.A_cyl, V_dead: p.V_dead, x_dancer: s.x_dancer };
+    case 'dancer_seal_fric': return { F_c: p.F_c, B_v: p.B_v, v_dancer: s.v_dancer, F_s: p.F_s, v_s: p.v_s };
+    case 'pid_integral': return { integral_prev: s.integral, e: R.e, dt: DT };
+    case 'pid_derivative': return { e: R.e, e_prev: s.e_prev, dt: DT };
+    case 'dancer_position': return { T_tension: R.T_tension_new, F_cyl: R.F_cyl, F_seal: R.F_seal, k_spring: p.k_spring };
+    case 'pid_output': return { Kp: p.Kp, e: R.e, Ki: p.Ki, integral: R.integral_new, Kd: p.Kd, derivative: R.derivative };
+    case 'dancer_velocity': return { x_dancer_new: R.x_dancer_new, x_dancer_prev: s.x_dancer, dt: DT };
+    case 'clamp_voltage': return { u: R.u, V_min: p.V_min, V_max: p.V_max };
+    default: return formula.params;
+  }
+}
+
+let lastDAGSnapshot = { R: {}, resolvedParams: {} };
+
+async function tick() {
+  const p = PARAMS, s = state;
+  const dag = buildFormulaDAG(p, s);
+  const R = {};
+
+  for (let level = 0; level < dag.length; level++) {
+    const formulas = dag[level];
+
+    // INLINES
+    if (level === 0) R.theta_rotor_new = s.theta_rotor + s.omega * DT;
+    if (level === 0) R.theta_output_new = s.theta_output + s.omega * DT;
+    if (level === 1) {
+      R.I_motor_new = Math.max(0, s.I_motor + R.di_dt * DT);
+      R.T_load = s.T_tension * R.r_new;
+    }
+    if (level === 3) {
+      R.T_motor_act = R.T_motor_raw + R.T_cog - R.T_gear_loss;
+      R.T_net = R.T_motor_act - R.T_fric - R.T_visc - R.T_transmitted;
+    }
+    if (level === 5) R.v_roller = R.omega_new * R.r_new;
+    if (level === 6) R.v_fabric = R.v_roller - R.v_slip;
+    if (level === 7) R.e = p.T_setpoint - R.T_tension_new;
+
+    const batch = formulas.map(f => ({
+      fn: f.fn,
+      params: (f.params === '_deferred_') ? resolveParams(f, R, p, s) : f.params,
+      out: f.out,
+    }));
+
+    const results = await execParallel(batch.map(b => ({ fn: b.fn, params: b.params })));
+    batch.forEach((b, i) => { R[b.out] = results[i]; });
+  }
+
+  // Write State
+  s.r = R.r_new;
+  s.J = R.J;
+  s.I_motor = R.I_motor_new;
+  s.omega = R.omega_new;
+  s.theta_rotor = R.theta_rotor_new;
+  s.theta_output = R.theta_output_new;
+  s.B_pk = R.B_pk;
+  s.v_slip = R.v_slip;
+  s.T_transmitted = R.T_transmitted;
+  s.v_fabric = R.v_fabric;
+  s.T_tension = R.T_tension_new;
+  s.x_dancer = R.x_dancer_new;
+  s.v_dancer = R.v_dancer_new;
+  s.integral = R.integral_new;
+  s.e_prev = R.e;
+  s.V_input = R.V_input_new;
+  s.T_motor = R.T_motor_new;
+
+  s.tickCount++;
+  s.simTime += DT;
+
+  pushHist(hist.T_tension, s.T_tension);
+  pushHist(hist.r, s.r);
+  pushHist(hist.I_motor, s.I_motor);
+  pushHist(hist.T_motor, s.T_motor);
+  pushSpark(spark.r, s.r);
+  pushSpark(spark.omega, s.omega);
+  pushSpark(spark.v_fabric, s.v_fabric);
+  pushSpark(spark.T_tension, s.T_tension);
+  pushSpark(spark.x_dancer, s.x_dancer);
+  pushSpark(spark.I_motor, s.I_motor);
+  pushSpark(spark.T_motor, s.T_motor);
+  pushSpark(spark.J, s.J);
+
+  lastDAGSnapshot.R = R;
+}
+
+// ═══════════════════════════════════════════════
+function drawChart(canvasId, data, color, refLine, refColor) {
+  const canvas = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 6, right: 10, bottom: 20, left: 48 };
+  const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+
+  let dMin = Infinity, dMax = -Infinity;
+  for (const v of data) { if (v < dMin) dMin = v; if (v > dMax) dMax = v; }
+  if (!isFinite(dMin)) { dMin = 0; dMax = 1; }
+  if (dMin === dMax) { dMin -= 1; dMax += 1; }
+  const range = dMax - dMin;
+  dMin -= range * 0.1; dMax += range * 0.1;
+
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.08)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (i / 4) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    const val = dMax - (i / 4) * (dMax - dMin);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#6b7280';
+    ctx.font = '9px SF Mono, Menlo, monospace'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(val >= 100 ? 0 : val >= 1 ? 1 : 2), pad.left - 4, y + 3);
+  }
+
+  if (refLine !== undefined) {
+    const ry = pad.top + (1 - (refLine - dMin) / (dMax - dMin)) * ch;
+    ctx.strokeStyle = refColor || '#D85A30'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, ry); ctx.lineTo(pad.left + cw, ry); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (data.length < 2) return;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = pad.left + (i / (HIST_LEN - 1)) * cw;
+    const y = pad.top + (1 - (data[i] - dMin) / (dMax - dMin)) * ch;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+// ═══════════════════════════════════════════════
+//  SPARKLINE
+// ═══════════════════════════════════════════════
+function sparkSVG(data, color, w, h) {
+  if (data.length < 2) return '';
+  let lo = Infinity, hi = -Infinity;
+  for (const v of data) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const range = hi - lo || 1;
+  const pts = data.map((v, i) => `${(i/(data.length-1)*w).toFixed(1)},${(h-((v-lo)/range)*(h-2)-1).toFixed(1)}`);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+}
+
+// ═══════════════════════════════════════════════
+//  STATE CARDS
+// ═══════════════════════════════════════════════
+const stateVars = [
+  { key:'B_pk', sym:'B_pk', name:'Peak Flux Density', unit:'T', color:'#BA7517', warn:null, crit:null },
+  { key:'v_slip', sym:'v_slip', name:'Fabric Slip', unit:'m/s', color:'#D85A30', warn:0.05, crit:0.1 },
+  { key:'r', sym:'r(t)', name:'Roll Radius', unit:'m', color:'#1D9E75', warn:null, crit:null },
+  { key:'omega', sym:'ω(t)', name:'Angular Velocity', unit:'rad/s', color:'#378ADD', warn:null, crit:null },
+  { key:'v_fabric', sym:'v(t)', name:'Fabric Speed', unit:'m/s', color:'#378ADD', warn:null, crit:null },
+  { key:'T_tension', sym:'T(t)', name:'Web Tension', unit:'N', color:'#378ADD', warn:80, crit:120 },
+  { key:'x_dancer', sym:'x_d(t)', name:'Dancer Displacement', unit:'m', color:'#BA7517', warn:0.08, crit:0.12 },
+  { key:'I_motor', sym:'I(t)', name:'Motor Current', unit:'A', color:'#BA7517', warn:15, crit:20 },
+  { key:'T_motor', sym:'T_m(t)', name:'Motor Temperature', unit:'°C', color:'#D85A30', warn:70, crit:85 },
+  { key:'J', sym:'J(t)', name:'Moment of Inertia', unit:'kg·m²', color:'#1D9E75', warn:null, crit:null },
+];
+
+function buildStateCards() {
+  document.getElementById('stateGrid').innerHTML = stateVars.map(sv =>
+    `<div class="state-card ok" id="sc_${sv.key}">
+      <div class="sc-left">
+        <div class="sc-sym">${sv.sym}</div>
+        <div class="sc-name">${sv.name}</div>
+        <div class="sc-val" id="scv_${sv.key}">—<span class="sc-unit">${sv.unit}</span></div>
+      </div>
+      <div class="sc-sparkline" id="sp_${sv.key}"></div>
+    </div>`
+  ).join('');
+}
+
+function updateStateCards() {
+  stateVars.forEach(sv => {
+    const val = state[sv.key];
+    const card = document.getElementById(`sc_${sv.key}`);
+    let status = 'ok';
+    if (sv.crit !== null && val > sv.crit) status = 'crit';
+    else if (sv.warn !== null && val > sv.warn) status = 'warn';
+    card.className = `state-card ${status}`;
+    document.getElementById(`scv_${sv.key}`).innerHTML = `${sigFig(val,4)}<span class="sc-unit">${sv.unit}</span>`;
+    document.getElementById(`sp_${sv.key}`).innerHTML = sparkSVG(spark[sv.key], sv.color, 64, 32);
+  });
+}
+
+function sigFig(n, sf) {
+  if (!Number.isFinite(n)) return '—';
+  if (n === 0) return '0';
+  return n.toFixed(Math.max(0, sf - 1 - Math.floor(Math.log10(Math.abs(n)))));
+}
+
+// ═══════════════════════════════════════════════
+//  SCHEMATIC
+// ═══════════════════════════════════════════════
+function updateSchematic() {
+  const s = state, p = PARAMS;
+  const rFrac = (s.r - p.r_min) / (p.r_max - p.r_min);
+  const svgR = 12 + rFrac * 58;
+  document.getElementById('sch_roll').setAttribute('r', svgR.toFixed(1));
+  document.getElementById('sch_r_val').textContent = s.r.toFixed(3) + 'm';
+
+  const maxDancer = 0.15, angle = Math.min(s.x_dancer / maxDancer, 1) * 30;
+  const rad = angle * Math.PI / 180, armLen = 50, bx = 420, by = 60;
+  const ex = (bx + armLen * Math.sin(rad)).toFixed(1), ey = (by + armLen * Math.cos(rad)).toFixed(1);
+  document.getElementById('sch_dancer_arm').setAttribute('x2', ex);
+  document.getElementById('sch_dancer_arm').setAttribute('y2', ey);
+  document.getElementById('sch_dancer_wheel').setAttribute('cx', ex);
+  document.getElementById('sch_dancer_wheel').setAttribute('cy', ey);
+}
+
+// ═══════════════════════════════════════════════
+//  TOP BAR
+// ═══════════════════════════════════════════════
+function formatTime(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateTopBar() {
+  document.getElementById('simTime').textContent = formatTime(state.simTime);
+  const pct = Math.max(0, ((state.r - PARAMS.r_min) / (PARAMS.r_max - PARAMS.r_min)) * 100);
+  document.getElementById('rollProgress').style.width = pct.toFixed(1) + '%';
+  document.getElementById('rollPct').textContent = pct.toFixed(1) + '%';
+}
+
+function updateChartValues() {
+  document.getElementById('ct_T').textContent = state.T_tension.toFixed(1) + ' N';
+  document.getElementById('ct_r').textContent = (state.r * 1000).toFixed(1) + ' mm';
+  document.getElementById('ct_I').textContent = state.I_motor.toFixed(2) + ' A';
+  document.getElementById('ct_Tm').textContent = state.T_motor.toFixed(1) + ' °C';
+}
+
+// ═══════════════════════════════════════════════
+//  CONTROLS
+// ═══════════════════════════════════════════════
+const btnPlay = document.getElementById('btnPlay');
+btnPlay.addEventListener('click', () => {
+  state.running = !state.running;
+  btnPlay.textContent = state.running ? '⏸ Pause' : '▶ Play';
+  btnPlay.classList.toggle('primary', !state.running);
+  btnPlay.classList.toggle('danger', state.running);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.running = false;
+  btnPlay.textContent = '▶ Play'; btnPlay.classList.add('primary'); btnPlay.classList.remove('danger');
+  state.r = PARAMS.r_max; state.omega = 0; state.v_fabric = 0;
+  state.T_tension = PARAMS.T_0;
+  state.x_dancer = PARAMS.T_0 / PARAMS.k_spring; state.I_motor = 0;
+  state.T_motor = PARAMS.T_amb;
+  state.J = 0.5*(PARAMS.m_core+PARAMS.rho_fabric*Math.PI*(PARAMS.r_max**2-PARAMS.r_core**2)*PARAMS.w_fabric)*PARAMS.r_max**2;
+  state.V_input = 20; state.e_prev = 0; state.integral = 0;
+  state.x_dancer_prev = PARAMS.T_0 / PARAMS.k_spring;
+  state.tickCount = 0; state.simTime = 0;
+  hist.T_tension=[]; hist.r=[]; hist.I_motor=[]; hist.T_motor=[];
+  Object.keys(spark).forEach(k => spark[k]=[]);
+});
+
+document.querySelectorAll('.speed-group .btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-group .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); state.speed = parseInt(btn.dataset.speed);
+  });
+});
+
+// ═══════════════════════════════════════════════
+//  BROADCAST CHANNEL (Sync with DAG Control Panel)
+// ═══════════════════════════════════════════════
+const dagChannel = new BroadcastChannel('worker1_dag');
+dagChannel.onmessage = (e) => {
+  if (e.data.type === 'PARAM_UPDATE') {
+    const { key, value } = e.data;
+    PARAMS[key] = value;
+    // Sync left-panel slider if it exists
+    const slider = document.getElementById('s_' + key);
+    if (slider) {
+      slider.value = value;
+      const sm = sliderMap.find(s => s.key === key);
+      if (sm) document.getElementById(sm.d).textContent = sm.fmt(value);
+    }
+  } else if (e.data.type === 'REQUEST_STATE') {
+    sendDAGUpdate();
+  }
+};
+
+function sendDAGUpdate() {
+  dagChannel.postMessage({
+    type: 'STATE_UPDATE',
+    R: lastDAGSnapshot.R,
+    params: PARAMS,
+    state: state,
+    DT: 0.01,
+    g: 9.81
+  });
+}
+
+// ═══════════════════════════════════════════════
+//  RENDER
+// ═══════════════════════════════════════════════
+function render() {
+
+  const sigCanvas = document.getElementById('chart_signature');
+  if (sigCanvas && typeof drawChart === 'function' && hist.I_signature) {
+     drawChart('chart_signature', hist.I_signature, '#BA7517');
+     const ct_I_sig = document.getElementById('ct_I_sig');
+     if (ct_I_sig) ct_I_sig.textContent = (state.I_env || 0).toFixed(2) + ' A';
+  }
+
+  drawChart('chart_tension', hist.T_tension, '#378ADD', PARAMS.T_setpoint, '#D85A30');
+  drawChart('chart_radius', hist.r, '#1D9E75');
+  drawChart('chart_current', hist.I_motor, '#BA7517', 15, '#BA7517');
+  drawChart('chart_temp', hist.T_motor, '#D85A30', 85, '#D85A30');
+  updateSchematic(); updateStateCards(); updateTopBar(); updateChartValues();
+  sendDAGUpdate();
+}
+
+// ═══════════════════════════════════════════════
+//  SIMULATION LOOP
+// ═══════════════════════════════════════════════
+async function loop() {
+  if (state.running) {
+    for (let i = 0; i < state.speed; i++) {
+      await tick();
+    }
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+
+document.getElementById('chk_stall')?.addEventListener('change', e => state.fault_stall = e.target.checked);
+document.getElementById('chk_overcurrent')?.addEventListener('change', e => state.fault_overcurrent = e.target.checked);
+
+document.getElementById('chk_backlash')?.addEventListener('change', e => PARAMS.backlash = e.target.checked ? 0.01 : 0.002);
+
+// ═══════════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════════
+initWorkerPool();
+buildStateCards();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

@@ -1,0 +1,173 @@
+================================================================================
+                    NASSENGER 8 DIGITAL TWIN - FORMULA MANIFEST
+================================================================================
+
+This document lists the mathematical formulas driving the physics and control 
+simulations for the workers in the Nassenger 8 Digital Twin application. 
+The formulas are executed level-wise or in parallel barriers using Web Workers.
+
+--------------------------------------------------------------------------------
+WORKER 1: UNWINDER (11-Level DAG)
+--------------------------------------------------------------------------------
+The unwinder dynamically updates material radius, inertia, motor currents, 
+torques, and dancer PID control.
+
+//  DEPENDENCY GRAPH:
+//  ┌─────────────────────────────────────────────────────────────┐
+//  │ L1  roll_radius ─┐   roll_mass ─┐   motor_resistance ──┐    │
+//  │                  ├─ L2 ─────────┤                      │    │
+//  │                  │ roll_inertia │   motor_di_dt        │    │
+//  │                  │      │       │        │             │    │
+//  │ L3               │      │  motor_torque_raw friction cogging│
+//  │                  │      │  viscous_drag dynamic_flux        │
+//  │                  │      │       │    │       │             │
+//  │ L4               │      │  gear_loss core_loss copper_loss  │
+//  │                  │      │  backlash_transmission           │
+//  │ L5               │   temp_rate  alpha                      │
+//  │ L6               │   omega_update motor_temp               │
+//  │ L7               │   fabric_slip_stribeck                  │
+//  │ L8               │   web_tension                           │
+//  │ L9               │   dancer_cyl_force dancer_seal_fric     │
+//  │                  │   pid_integral  pid_derivative          │
+//  │ L10              │   dancer_position pid_output            │
+//  │ L11              │   dancer_velocity clamp_voltage         │
+//  └─────────────────────────────────────────────────────────────┘
+
+[ Level 1 ]
+roll_radius:           result = p.r_prev - (p.v_fabric * p.dt) / (2 * Math.PI * p.r_prev);
+roll_mass:             result = p.m_core + p.rho_fabric * Math.PI * (p.r * p.r - p.r_core * p.r_core) * p.w_fabric;
+motor_resistance:      result = p.R_20 * (1 + p.alpha_cu * (p.T_motor - 20));
+
+[ Level 2 ]
+roll_inertia:          result = 0.5 * p.m_roll * p.r * p.r;
+motor_di_dt:           result = (p.V_input - p.I_motor * p.R_motor_T - p.K_e * p.omega) / p.L_motor;
+
+[ Level 3 ]
+motor_torque_raw:      result = p.K_t * p.I_motor;
+friction_torque:       result = p.mu_bearing * p.m_roll * p.g * p.r_shaft;
+cogging_torque:        result = p.T_cog_peak * Math.sin(p.N_slots * p.theta_rotor);
+viscous_drag:          result = p.B_visc * p.omega;
+dynamic_flux:          let mu_0 = 4 * Math.PI * 1e-7;
+                       let I_mag = p.I_motor * Math.sin(p.phi_lag);
+                       let B_calc = (mu_0 * p.mu_r * p.N_turns * Math.abs(I_mag)) / (2 * p.l_gap);
+                       result = Math.min(B_calc, p.B_sat);
+
+[ Level 4 ]
+gear_loss:             result = Math.abs(p.T_motor_raw) * (1 - p.eta_gear);
+core_loss:             result = (p.k_h * Math.abs(p.omega) + p.k_e * p.omega * p.omega) * p.B_pk * p.B_pk * p.Vol_core;
+copper_loss:           result = p.I_motor * p.I_motor * p.R_motor_T;
+backlash_transmission: let theta_err = p.theta_output - p.theta_input / p.gear_ratio;
+                       if (Math.abs(theta_err) < p.backlash / 2) {
+                         result = 0;
+                       } else {
+                         result = p.k_shaft * (Math.abs(theta_err) - p.backlash / 2) * Math.sign(theta_err);
+                       }
+
+[ Level 5 ]
+temp_rate:             result = (p.P_cu + p.P_core - (p.T_motor - p.T_amb) / p.R_th) / p.C_th;
+alpha:                 result = p.J > 1e-12 ? p.T_net / p.J : 0;
+
+[ Level 6 ]
+omega_update:          result = p.omega_prev + p.alpha * p.dt;
+motor_temp:            result = p.T_motor_prev + p.dT_dt * p.dt;
+
+[ Level 7 ]
+fabric_slip_stribeck:  let mu_eff = p.mu_s * Math.exp(-p.k_dec * Math.abs(p.v_slip_prev)) + p.mu_k * (1 - Math.exp(-p.k_dec * Math.abs(p.v_slip_prev)));
+                       let F_normal = p.m_roll * p.g;
+                       let F_adhesion = mu_eff * F_normal;
+                       if (p.T_tension <= F_adhesion) {
+                         result = 0;
+                       } else if (p.T_tension <= F_adhesion * p.slip_ratio) {
+                         result = p.k_micro * (p.T_tension - F_adhesion);
+                       } else {
+                         result = p.v_roller - p.v_fabric_free;
+                       }
+
+[ Level 8 ]
+web_tension:           result = p.E_fabric * p.A_fabric * (p.v_downstream - p.v_fabric) / (p.v_nominal > 0.001 ? p.v_nominal : 0.001) + p.T_0;
+
+[ Level 9 ]
+dancer_cyl_force:      result = p.P_supply * p.A_cyl * (p.V_dead / (p.V_dead + p.A_cyl * p.x_dancer));
+dancer_seal_fric:      result = p.F_c + p.B_v * p.v_dancer + p.F_s * Math.exp(-Math.abs(p.v_dancer) / p.v_s) * Math.sign(p.v_dancer);
+pid_integral:          result = p.integral_prev + p.e * p.dt;
+pid_derivative:        result = p.dt !== 0 ? (p.e - p.e_prev) / p.dt : 0;
+
+[ Level 10 ]
+dancer_position:       result = (p.T_tension - p.F_cyl - p.F_seal) / p.k_spring;
+pid_output:            result = p.Kp * p.e + p.Ki * p.integral + p.Kd * p.derivative;
+
+[ Level 11 ]
+dancer_velocity:       result = (p.x_dancer_new - p.x_dancer_prev) / p.dt;
+clamp_voltage:         result = Math.max(p.V_min, Math.min(p.V_max, p.u));
+
+
+
+
+--------------------------------------------------------------------------------
+WORKER 14: BELT WASHING UNIT (4 Steps)
+--------------------------------------------------------------------------------
+[ Step 1 - Water Dynamics & Brush Speed ]
+1. Flow Rate:        Q = V_pump * A_pipe * 1000
+2. Brush Speed:      v_brush = (RPM * pi * D_brush) / 60
+
+[ Step 2 - Fluid Mechanics ]
+3. Impact Press:     P_impact = 0.5 * rho * v_brush^2
+4. Film Thickness:   h_film = Q / (W_belt * v_belt)
+5. Wash Time:        t_wash = L_wash / v_belt
+
+[ Step 3 - Cleaning Physics ]
+6. Cleaning Eff:     E_clean = (1 - exp(-k * P_impact * t_wash)) * 100
+7. Remaining Dirt:   D_rem = D_initial * (1 - E_clean/100)
+8. Friction Torque:  T_fric = mu_brush * F_normal * (D_brush / 2)
+
+[ Step 4 - Power & Wear ]
+9. Brush Power:      P_brush = T_fric * (2 * pi * RPM / 60)
+10. Mech Wear:       W_rate = k_wear * F_normal * v_brush
+
+
+--------------------------------------------------------------------------------
+WORKER 15: ENVIRONMENTAL & SENSOR FUSION (4 Steps)
+--------------------------------------------------------------------------------
+[ Step 1 - Environmental Core ]
+1. Base Temp:        T_base = T_target + A * sin(2*pi * time/T_period)
+2. Base Humidity:    RH_base = RH_target + B * cos(2*pi * time/H_period)
+3. Sat Vapor Press:  P_sat = 6.112 * exp((17.67 * T) / (T + 243.5))
+
+[ Step 2 - Actual Vapor & Enthalpy ]
+4. Act Vapor Press:  P_act = P_sat * (RH / 100)
+5. Air Enthalpy:     h_air = 1.006 * T + (0.622 * P_act / (1013.25 - P_act)) * (2501 + 1.84 * T)
+6. Filter Update:    T_filt = alpha * T_base + (1 - alpha) * T_filt_prev
+
+[ Step 3 - Sensor Fusion & Dew Point ]
+7. Fusion Error:     E_fusion = abs(T_sensor1 - T_sensor2) + (RH_sensor / 100)
+8. Sensor Drift:     Drift = Drift_prev + k_drift * E_fusion * dt
+9. Dew Point:        T_dew = (243.5 * ln(P_act/6.112)) / (17.67 - ln(P_act/6.112))
+
+[ Step 4 - Compliance Decay ]
+10. Compliance:      C = C_prev - (E_fusion > Threshold ? decay_rate : -recovery_rate)
+
+
+--------------------------------------------------------------------------------
+WORKER 16: CENTRAL CONTROL PANEL (4 Steps)
+--------------------------------------------------------------------------------
+[ Step 1 - Poisson Queue Arrivals ]
+1. Arrival Rate:     lambda_eff = lambda_base * (1 + sin(time))
+2. Queue Updates:    Q_len = Q_len + (Arrivals - Services)
+3. Utilization:      Rho = lambda_eff / mu_service
+
+[ Step 2 - Wait Time & PID Control ]
+4. Est Wait Time:    W_q = Rho / (mu_service - lambda_eff)
+5. PID Error:        e_q = Q_target - Q_len
+6. PID Integration:  Int_q += e_q * dt
+
+[ Step 3 - PID Output & Job Dispatch ]
+7. Control Signal:   u_q = Kp*e_q + Ki*Int_q + Kd*(e_q - e_prev)/dt
+8. Job Dispatched:   Jobs_D = floor(u_q * scale)
+9. Net Throughput:   Thru_net = Jobs_D * Yield
+
+[ Step 4 - Fault Injection & Efficiency ]
+10. Fault Prob:      P_fault = p_base * (1 + Q_len/100)
+11. Binomial Faults: N_faults ~ Binomial(n_workers, P_fault)
+12. Sys Efficiency:  Eff = (Thru_net / (lambda_eff + 1)) * (1 - N_faults/n_workers)
+
+==================================================================================

@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker 16 — Central Control Panel | Nassenger 8 Digital Twin</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-alt: #f7f8fa;
+  --text: #1a1d23;
+  --text-muted: #6b7280;
+  --border: #e2e5ea;
+  --accent: #378ADD;
+  --accent-soft: rgba(55,138,221,0.1);
+  --green: #1D9E75;
+  --amber: #BA7517;
+  --red: #D85A30;
+  --chart-grid: rgba(0,0,0,0.08);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-alt: #22252f;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border: #2d3040;
+    --accent: #5a9fef;
+    --accent-soft: rgba(90,159,239,0.12);
+    --chart-grid: rgba(255,255,255,0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.3);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar h1 span {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.sim-time {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn:hover { background: var(--surface-alt); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.9; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: var(--red); color: #fff; }
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.speed-group {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.speed-group .btn {
+  border: none;
+  border-radius: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.speed-group .btn + .btn { border-left: 1px solid var(--border); }
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.progress-bar {
+  width: 100px;
+  height: 6px;
+  background: var(--surface-alt);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.main {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  min-height: calc(100vh - 52px);
+  align-items: flex-start;
+}
+
+.col-left, .col-right {
+  flex: 0 0 280px;
+  min-width: 0;
+}
+
+.col-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.card-body { padding: 12px 14px; }
+
+.slider-group { margin-bottom: 10px; }
+.slider-group:last-child { margin-bottom: 0; }
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.slider-label .name { color: var(--text); font-weight: 500; }
+.slider-label .val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.state-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.state-card.ok { border-color: var(--green); }
+.state-card.warn { border-color: var(--amber); background: rgba(186,117,23,0.06); }
+.state-card.crit { border-color: var(--red); background: rgba(216,90,48,0.06); }
+
+.state-card .sc-left { min-width: 0; }
+.state-card .sc-sym {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.state-card .sc-name { font-size: 11px; color: var(--text-muted); }
+.state-card .sc-val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.state-card .sc-unit { font-size: 10px; color: var(--text-muted); margin-left: 2px; font-weight: 400; }
+.state-card .sc-sparkline { width: 64px; height: 32px; flex-shrink: 0; }
+
+.schematic-wrap { padding: 12px; display: flex; justify-content: center; }
+.schematic-wrap svg { max-width: 100%; height: auto; }
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.chart-title {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+.chart-title .ct-value {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chart-canvas-wrap { padding: 6px 8px 8px; position: relative; }
+.chart-canvas-wrap canvas { width: 100%; display: block; }
+
+.parallel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  margin-left: 8px;
+}
+
+.formula-chain-toggle {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.formula-chain-toggle .arrow { transition: transform 0.2s ease; font-size: 10px; }
+.formula-chain-toggle .arrow.open { transform: rotate(90deg); }
+
+.formula-chain-body {
+  display: none;
+  padding: 0 14px 14px;
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", monospace;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.formula-chain-body.open { display: block; }
+
+.formula-step {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.formula-step:last-child { border-bottom: none; }
+
+.formula-step .step-num { font-weight: 700; color: var(--accent); margin-right: 6px; }
+
+.formula-step .step-title {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+}
+
+.formula-step .step-eq { color: var(--accent); font-size: 11px; }
+
+.formula-step .parallel-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.formula-step .sequential-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(55,138,221,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(55,138,221,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media (max-width: 900px) {
+  .main { flex-direction: column; }
+  .col-left, .col-right { flex: none; width: 100%; }
+  .charts-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Worker 16 — Central Control Panel<span>Nassenger 8 Digital Twin</span></h1>
+    <div class="sim-time" id="simTime">00:00:00</div>
+    <button class="btn primary" id="btnPlay">▶ Play</button>
+    <button class="btn" id="btnReset">↺ Reset</button>
+    <div class="speed-group">
+      <button class="btn active" data-speed="1">1×</button>
+      <button class="btn" data-speed="5">5×</button>
+      <button class="btn" data-speed="10">10×</button>
+      <button class="btn" data-speed="50">50×</button>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <span>Efficiency:</span>
+    <div class="progress-bar"><div class="progress-fill" id="effProgress"></div></div>
+    <span id="effPct">95%</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: Parameters -->
+  <div class="col-left">
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Job Queue Parameters</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Arrival Rate λ</span><span class="val" id="v_lambda">2.0 /min</span></div>
+          <input type="range" id="s_lambda" min="0.5" max="5" step="0.1" value="2">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Service Rate μ</span><span class="val" id="v_mu">2.5 /min</span></div>
+          <input type="range" id="s_mu" min="0.5" max="8" step="0.1" value="2.5">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Max Queue Depth</span><span class="val" id="v_q_max">20</span></div>
+          <input type="range" id="s_q_max" min="5" max="50" step="1" value="20">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">PID Supervision</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">K_p (Proportional)</span><span class="val" id="v_kp">1.50</span></div>
+          <input type="range" id="s_kp" min="0.1" max="5" step="0.1" value="1.5">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">K_i (Integral)</span><span class="val" id="v_ki">0.30</span></div>
+          <input type="range" id="s_ki" min="0" max="2" step="0.05" value="0.3">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">K_d (Derivative)</span><span class="val" id="v_kd">0.10</span></div>
+          <input type="range" id="s_kd" min="0" max="1" step="0.01" value="0.1">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Fault & Reliability</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Worker Count</span><span class="val" id="v_n_workers">13</span></div>
+          <input type="range" id="s_n_workers" min="5" max="15" step="1" value="13">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Fault Probability</span><span class="val" id="v_p_fault">0.005</span></div>
+          <input type="range" id="s_p_fault" min="0" max="0.05" step="0.001" value="0.005">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Recovery Rate</span><span class="val" id="v_r_recover">0.100 /s</span></div>
+          <input type="range" id="s_r_recover" min="0.01" max="0.5" step="0.01" value="0.1">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Visualisation -->
+  <div class="col-center">
+
+    <!-- Schematic -->
+    <div class="card">
+      <div class="card-header">Schematic — Worker 16 Central Control Panel</div>
+      <div class="schematic-wrap">
+        <svg id="schematic" viewBox="0 0 600 260" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--chart-grid)" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="600" height="260" fill="url(#grid)" opacity="0.4"/>
+
+          <!-- Queue visualisation -->
+          <rect x="30" y="80" width="120" height="60" rx="8" fill="var(--surface-alt)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="90" y="105" font-size="10" fill="var(--accent)" text-anchor="middle" font-weight="700">JOB QUEUE</text>
+          <text id="sch_queue_val" x="90" y="125" font-size="12" fill="var(--text)" text-anchor="middle" font-weight="700" font-family="SF Mono, monospace">0 / 20</text>
+
+          <!-- Queue bar -->
+          <rect x="35" y="135" width="110" height="4" rx="2" fill="var(--border)"/>
+          <rect id="sch_queue_bar" x="35" y="135" width="0" height="4" rx="2" fill="var(--accent)"/>
+
+          <!-- Arrow: queue to dispatcher -->
+          <path d="M155 110 L185 110" stroke="var(--accent)" stroke-width="2" marker-end="url(#arrow)"/>
+          <defs><marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--accent)"/></marker></defs>
+
+          <!-- PID Controller -->
+          <rect x="190" y="80" width="100" height="60" rx="8" fill="var(--surface-alt)" stroke="var(--green)" stroke-width="2"/>
+          <text x="240" y="100" font-size="9" fill="var(--green)" text-anchor="middle" font-weight="700">PID CONTROL</text>
+          <text id="sch_pid_val" x="240" y="118" font-size="10" fill="var(--text)" text-anchor="middle" font-weight="600" font-family="SF Mono, monospace">u = 0.0</text>
+          <text id="sch_err_val" x="240" y="132" font-size="8" fill="var(--text-muted)" text-anchor="middle" font-family="SF Mono, monospace">e = 0.0</text>
+
+          <!-- Arrow: PID to workers -->
+          <path d="M295 110 L325 110" stroke="var(--green)" stroke-width="2" marker-end="url(#arrow2)"/>
+          <defs><marker id="arrow2" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="var(--green)"/></marker></defs>
+
+          <!-- Worker LEDs -->
+          <g id="worker_leds">
+            <text x="430" y="55" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Worker Status (1–15)</text>
+            <circle id="wled_1" cx="350" cy="75" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_2" cx="375" cy="75" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_3" cx="400" cy="75" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_4" cx="425" cy="75" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_5" cx="450" cy="75" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_6" cx="350" cy="100" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_7" cx="375" cy="100" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_8" cx="400" cy="100" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_9" cx="425" cy="100" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_10" cx="450" cy="100" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_11" cx="362" cy="125" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_12" cx="387" cy="125" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_13" cx="412" cy="125" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_14" cx="437" cy="125" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+            <circle id="wled_15" cx="462" cy="125" r="8" fill="var(--green)" stroke="var(--border)" stroke-width="1.5"/>
+          </g>
+
+          <!-- Active/Faulted count -->
+          <text id="sch_active_val" x="410" y="155" font-size="10" fill="var(--green)" text-anchor="middle" font-weight="600" font-family="SF Mono, monospace">Active: 13/13</text>
+
+          <!-- Throughput / Arrival indicators -->
+          <text x="90" y="175" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Arrivals</text>
+          <text id="sch_lambda_val" x="90" y="190" font-size="10" fill="var(--accent)" text-anchor="middle" font-weight="600" font-family="SF Mono, monospace">λ = 2.0/min</text>
+
+          <text x="240" y="175" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Throughput</text>
+          <text id="sch_throughput_val" x="240" y="190" font-size="10" fill="var(--green)" text-anchor="middle" font-weight="600" font-family="SF Mono, monospace">μ_eff = 0.0/min</text>
+
+          <!-- Efficiency bar -->
+          <text x="300" y="220" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-weight="600">System Efficiency</text>
+          <rect x="180" y="228" width="240" height="8" rx="4" fill="var(--border)"/>
+          <rect id="sch_eff_bar" x="180" y="228" width="228" height="8" rx="4" fill="var(--green)"/>
+          <text id="sch_eff_val" x="300" y="250" font-size="10" fill="var(--text)" text-anchor="middle" font-weight="700" font-family="SF Mono, monospace">95.0%</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-title">Current Signature i(t) <span class="ct-value" id="ct_I_sig" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_signature" height="130"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Queue Depth <span class="ct-value" id="ct_queue" style="color:#378ADD">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_queue" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">PID Output <span class="ct-value" id="ct_pid" style="color:#1D9E75">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_pid" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Throughput <span class="ct-value" id="ct_throughput" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_throughput" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">System Efficiency <span class="ct-value" id="ct_eff" style="color:#D85A30">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_eff" height="130"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Formula Chain -->
+    <div class="card">
+      <div class="formula-chain-toggle" id="formulaToggle">
+        <span>Formula Chain (8 steps, queue/PID control) <span class="parallel-badge">⚡ Parallel</span></span>
+        <span class="arrow" id="formulaArrow">▶</span>
+      </div>
+      <div class="formula-chain-body" id="formulaBody">
+        <div class="formula-step">
+          <span class="step-title">Step 1 — Poisson Job Arrivals <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">n_arrive ~ Poisson(λ · dt) | queue += n_arrive</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 2 — M/M/1 Queue Utilization <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">ρ = λ / (μ · n_active) | L_q = ρ² / (1 − ρ)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 3 — PID Error Computation <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">e(t) = queue_target − queue_depth | integral += e(t)·dt</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 4 — PID Control Output <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">u(t) = K_p·e + K_i·∫e·dt + K_d·de/dt</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 5 — Binomial Fault Injection <span class="parallel-tag">N parallel</span></span>
+          <span class="step-eq">fault_i ~ Bernoulli(p_fault) | recover_i ~ Bernoulli(r_recover·dt)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 6 — Service Rate Adjustment <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">μ_eff = μ · n_active · clamp(1 + u(t), 0.5, 1.5)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 7 — Queue Drain <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">n_served = min(queue, Poisson(μ_eff · dt)) | queue -= n_served</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 8 — System Efficiency <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">η = (n_served / max(1, n_arrive)) · (n_active / N) · (1 − queue/q_max)</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: State Readouts -->
+  <div class="col-right">
+
+    <div class="card" style="margin-top:10px;">
+      <div class="card-header">Energy Fault Injection</div>
+      <div class="card-body" style="padding:10px; display:flex; gap:10px;">
+        <label style="font-size:11px;"><input type="checkbox" id="chk_stall"> Stall (I > 2.5x)</label>
+        <label style="font-size:11px;"><input type="checkbox" id="chk_overcurrent"> Overcurrent (1.5x)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Live State Variables</div>
+      <div class="card-body">
+        <div class="state-grid" id="stateGrid"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const WORKER_CODE = `
+self.onmessage = function(e) {
+  const { id, fn, params } = e.data;
+  let result;
+  const p = params;
+  switch(fn) {
+    case 'power_electronics': // LAYER A
+      result = { V_dc: 1.35 * p.V_line, V_bus: p.V_line * 1.35 - (p.I_load || 0) * p.R_bus, D: p.V_input ? p.V_input / (p.V_line * 1.35 + 1e-6) : 0.5, P_sw: 0.5 * (p.V_line * 1.35) * (p.I_load || 0) * (p.t_r + p.t_f) * p.f_sw, E_gate: 0.5 * p.C_gate * p.V_gs * p.V_gs };
+      break;
+    case 'motor_electrical_adv': // LAYER B
+      result = { delta_I: ((p.V_bus || 600) - (p.K_e||0.1) * (p.omega || 0)) * p.D * (1/p.f_sw) / (p.L_motor||0.05), P_elec: (p.V_input || 0) * (p.I_load || 0), P_cu: (p.I_load || 0) * (p.I_load || 0) * (p.R_motor||0.1), P_fe: p.k_h * p.f_elec * p.B_field * p.B_field + p.k_e * p.f_elec * p.f_elec * p.B_field * p.B_field };
+      break;
+    case 'current_signature': // LAYER C
+      result = { I_env: (p.T_load||10) / ((p.K_t||0.1) * p.efficiency), f_mesh: p.N_teeth * ((p.omega||0) * 60 / (2 * Math.PI)) / 60, f_bpfo: (p.N_balls / 2) * (((p.omega||0) * 60 / (2 * Math.PI)) / 60) * (1 - (p.d_ball / p.D_pitch) * Math.cos(p.alpha_contact)), THD_i: 0.05 };
+      break;
+    case 'mechanical_drive': // LAYER D
+      result = { theta_twist: (p.T_net || 0) * p.L_shaft / (p.G_shear * p.J_polar), delta_belt: (p.F_belt || 0) * p.L_belt / (p.E_belt * p.A_belt), P_gear: (p.T_net || 0) * (p.omega || 0) * (1 - p.eta_gear), T_bearing: (p.mu_b||0.01) * p.F_radial * p.r_bearing, omega_crit: Math.sqrt(p.k_shaft / p.J_shaft) };
+      break;
+    case 'load_energy': // LAYER E
+      result = { E_tension: 0.5 * (p.T_tension || 0)**2 * p.L_span / (p.E_fabric * p.A_fabric), P_nip: (p.F_nip || 0) / (2 * (p.r_roller || 0.1) * (p.w_fabric || 1)), Q_fabric: p.k_fabric * p.A_heat * (p.dT_dx || 0), E_meniscus: Math.PI * p.r_nozzle**2 * p.gamma_ink, E_piezo: 0.5 * p.C_piezo * p.V_drive**2 };
+      break;
+
+    case 'poisson_arrivals': {
+      // Poisson random: Knuth algorithm
+      const L = Math.exp(-p.lambda_dt);
+      let k = 0, pp = 1;
+      do { k++; pp *= Math.random(); } while(pp > L);
+      result = k - 1;
+      break;
+    }
+    case 'queue_utilization':
+      result = p.n_active > 0 ? p.lambda / (p.mu * p.n_active) : 1;
+      break;
+    case 'pid_error':
+      result = p.target - p.current;
+      break;
+    case 'pid_output':
+      result = p.kp * p.error + p.ki * p.integral + p.kd * p.derivative;
+      break;
+    case 'fault_check':
+      result = Math.random() < p.p_fault ? 1 : 0;
+      break;
+    case 'recovery_check':
+      result = Math.random() < p.p_recover ? 1 : 0;
+      break;
+    case 'service_rate':
+      result = p.mu * p.n_active * Math.max(0.5, Math.min(1.5, 1 + p.u));
+      break;
+    case 'efficiency': {
+      const q_factor = Math.max(0, 1 - p.queue / p.q_max);
+      const w_factor = p.n_active / p.n_total;
+      const s_factor = p.n_arrive > 0 ? Math.min(1, p.n_served / p.n_arrive) : 1;
+      result = s_factor * w_factor * q_factor;
+      break;
+    }
+    default:
+      result = NaN;
+  }
+  self.postMessage({ id, result });
+};
+`;
+
+const WORKER_POOL_SIZE = 4;
+const workerPool = [];
+const workerQueue = [];
+let workerIdCounter = 0;
+
+function createWorker() {
+  const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  const worker = new Worker(url);
+  worker.busy = false;
+  worker.pending = null;
+  URL.revokeObjectURL(url);
+  return worker;
+}
+
+function initWorkerPool() {
+  for (let i = 0; i < WORKER_POOL_SIZE; i++) {
+    const w = createWorker();
+    w.onmessage = function(e) {
+      w.busy = false;
+      if (w.pending) {
+        const { resolve } = w.pending;
+        w.pending = null;
+        resolve(e.data.result);
+      }
+      drainWorkerQueue(w);
+    };
+    workerPool.push(w);
+  }
+}
+
+function drainWorkerQueue(worker) {
+  if (workerQueue.length === 0) return;
+  const task = workerQueue.shift();
+  worker.busy = true;
+  worker.postMessage({ id: task.id, fn: task.fn, params: task.params });
+}
+
+function execFormula(fn, params) {
+  return new Promise(resolve => {
+    const idle = workerPool.find(w => !w.busy);
+    if (idle) {
+      idle.busy = true;
+      idle.onmessage = function(e) {
+        idle.busy = false;
+        resolve(e.data.result);
+        drainWorkerQueue(idle);
+      };
+      idle.postMessage({ id: workerIdCounter++, fn, params });
+    } else {
+      workerQueue.push({ id: workerIdCounter++, fn, params, resolve });
+    }
+  });
+}
+
+async function execParallel(formulas) {
+  return Promise.all(formulas.map(f => execFormula(f.fn, f.params)));
+}
+
+const PARAMS = {
+  // LAYER A-E Energy Chain Params
+  D_pwm: 0.5, V_bus_nom: 600, t_r: 1e-7, t_f: 1e-7, f_sw: 10000, C_gate: 1e-9, V_gs: 15, R_bus: 0.1, V_line: 400,
+  k_h: 0.01, k_e: 0.001, B_field: 1.5, f_elec: 50,
+  efficiency: 0.9, N_teeth: 50, N_balls: 8, d_ball: 0.01, D_pitch: 0.05, alpha_contact: 0, I_nominal: 10,
+  L_shaft: 1.0, G_shear: 79e9, J_polar: 1e-4, L_belt: 2.0, E_belt: 1e9, A_belt: 0.001, eta_gear: 0.98, F_radial: 500, r_bearing: 0.02, k_shaft: 1e6, J_shaft: 0.05,
+  L_span: 1.0, k_fabric: 0.5, A_heat: 1.0, gamma_ink: 0.03, r_nozzle: 1e-5, C_piezo: 1e-6, V_drive: 50,
+  lambda: 2.0, mu: 2.5, q_max: 20,
+  kp: 1.5, ki: 0.3, kd: 0.1,
+  n_workers: 13, p_fault: 0.005, r_recover: 0.1,
+};
+
+const state = {
+  I_env: 0, delta_I: 0, fault_stall: false, fault_overcurrent: false,
+  queue_depth: 0, rho: 0, pid_error: 0, pid_output: 0,
+  pid_integral: 0, pid_prev_error: 0,
+  n_active: 13, n_faulted: 0,
+  mu_eff: 0, throughput: 0, efficiency: 0.95,
+  n_arrived: 0, n_served: 0,
+  worker_status: new Array(15).fill(1), // 1 = active, 0 = faulted
+  total_arrived: 0, total_served: 0,
+  tickCount: 0, simTime: 0, running: false, speed: 1,
+};
+
+const DT = 0.01;
+
+const HIST_LEN = 300, SPARK_LEN = 50;
+const hist = { queue_depth: [], pid_output: [], throughput: [], efficiency: [] };
+  hist.I_signature = []; spark.I_signature = [];
+const spark = { queue_depth:[], rho:[], pid_error:[], pid_output:[], n_active:[], mu_eff:[], throughput:[], efficiency:[] };
+
+function pushHist(arr, val) { arr.push(val); if (arr.length > HIST_LEN) arr.shift(); }
+function pushSpark(arr, val) { arr.push(val); if (arr.length > SPARK_LEN) arr.shift(); }
+
+const sliderMap = [
+  { id:'s_lambda', key:'lambda', fmt:v=>v.toFixed(1)+' /min', d:'v_lambda' },
+  { id:'s_mu', key:'mu', fmt:v=>v.toFixed(1)+' /min', d:'v_mu' },
+  { id:'s_q_max', key:'q_max', fmt:v=>v.toFixed(0), d:'v_q_max' },
+  { id:'s_kp', key:'kp', fmt:v=>v.toFixed(2), d:'v_kp' },
+  { id:'s_ki', key:'ki', fmt:v=>v.toFixed(2), d:'v_ki' },
+  { id:'s_kd', key:'kd', fmt:v=>v.toFixed(2), d:'v_kd' },
+  { id:'s_n_workers', key:'n_workers', fmt:v=>v.toFixed(0), d:'v_n_workers' },
+  { id:'s_p_fault', key:'p_fault', fmt:v=>v.toFixed(3), d:'v_p_fault' },
+  { id:'s_r_recover', key:'r_recover', fmt:v=>v.toFixed(3)+' /s', d:'v_r_recover' },
+];
+
+sliderMap.forEach(s => {
+  const el = document.getElementById(s.id);
+  const disp = document.getElementById(s.d);
+  el.value = PARAMS[s.key];
+  disp.textContent = s.fmt(PARAMS[s.key]);
+  el.addEventListener('input', () => { PARAMS[s.key] = parseFloat(el.value); disp.textContent = s.fmt(PARAMS[s.key]); });
+});
+
+async function tick() {
+  const p = PARAMS, s = state;
+
+  // Step 1: Poisson job arrivals
+  const [n_arrive] = await execParallel([
+    { fn: 'poisson_arrivals', params: { lambda_dt: p.lambda * DT } }
+  ]);
+  s.n_arrived = n_arrive;
+  s.queue_depth = Math.min(p.q_max, s.queue_depth + n_arrive);
+  s.total_arrived += n_arrive;
+
+  // Step 2: Queue utilization
+  const [rho] = await execParallel([
+    { fn: 'queue_utilization', params: { lambda: p.lambda, mu: p.mu, n_active: s.n_active } }
+  ]);
+  s.rho = Math.min(1, rho);
+
+  // Step 3: PID error
+  const queue_target = 2; // target queue depth
+  const [pid_err] = await execParallel([
+    { fn: 'pid_error', params: { target: queue_target, current: s.queue_depth } }
+  ]);
+  s.pid_error = pid_err;
+  s.pid_integral += pid_err * DT;
+  s.pid_integral = Math.max(-10, Math.min(10, s.pid_integral)); // anti-windup
+
+  // Step 4: PID output
+  const derivative = (pid_err - s.pid_prev_error) / DT;
+  s.pid_prev_error = pid_err;
+  const [pid_u] = await execParallel([
+    { fn: 'pid_output', params: { kp: p.kp, ki: p.ki, kd: p.kd, error: pid_err, integral: s.pid_integral, derivative: derivative } }
+  ]);
+  s.pid_output = Math.max(-1, Math.min(1, pid_u * 0.1));
+
+  // Step 5: Fault injection / recovery (parallel for each worker)
+  const n_total = Math.round(p.n_workers);
+  for (let i = 0; i < n_total; i++) {
+    if (s.worker_status[i] === 1) {
+      // Check for fault
+      if (Math.random() < p.p_fault * DT) {
+        s.worker_status[i] = 0;
+      }
+    } else {
+      // Check for recovery
+      if (Math.random() < p.r_recover * DT) {
+        s.worker_status[i] = 1;
+      }
+    }
+  }
+  // Ensure workers beyond n_total are inactive
+  for (let i = n_total; i < 15; i++) {
+    s.worker_status[i] = -1; // disabled
+  }
+  s.n_active = s.worker_status.filter(v => v === 1).length;
+  s.n_faulted = s.worker_status.filter(v => v === 0).length;
+
+  // Step 6: Service rate adjustment
+  const [mu_eff] = await execParallel([
+    { fn: 'service_rate', params: { mu: p.mu, n_active: s.n_active, u: s.pid_output } }
+  ]);
+  s.mu_eff = mu_eff;
+
+  // Step 7: Queue drain
+  const [n_served_raw] = await execParallel([
+    { fn: 'poisson_arrivals', params: { lambda_dt: s.mu_eff * DT } }
+  ]);
+  s.n_served = Math.min(s.queue_depth, n_served_raw);
+  s.queue_depth = Math.max(0, s.queue_depth - s.n_served);
+  s.total_served += s.n_served;
+  s.throughput = s.total_served > 0 ? (s.total_served / Math.max(0.01, s.simTime)) : 0;
+
+  // Step 8: System efficiency
+  const [eff] = await execParallel([
+    { fn: 'efficiency', params: { n_arrive: Math.max(1, s.n_arrived), n_served: s.n_served, n_active: s.n_active, n_total: n_total, queue: s.queue_depth, q_max: p.q_max } }
+  ]);
+  // Smooth efficiency
+  s.efficiency = s.efficiency * 0.95 + eff * 0.05;
+
+  
+  // ── LAYER A-E: Energy Chain (Parallel) ──
+  if (typeof execParallel === 'function') {
+    const [resA, resB, resC, resD, resE] = await execParallel([
+      { fn: 'power_electronics', params: { V_line: p.V_line, I_load: s.I_motor || s.I_load || 0, R_bus: p.R_bus, V_input: s.V_input || 0, t_r: p.t_r, t_f: p.t_f, f_sw: p.f_sw, C_gate: p.C_gate, V_gs: p.V_gs } },
+      { fn: 'motor_electrical_adv', params: { K_e: p.K_e, omega: s.omega || 0, V_bus: 600, D: 0.5, f_sw: p.f_sw, L_motor: p.L_motor, V_input: s.V_input || 0, I_load: s.I_motor || s.I_load || 0, R_motor: p.R_motor, k_h: p.k_h, f_elec: p.f_elec, B_field: p.B_field, k_e: p.k_e } },
+      { fn: 'current_signature', params: { omega: s.omega || 0, T_load: s.T_load || p.T_load, K_t: p.K_t, efficiency: p.efficiency, N_teeth: p.N_teeth, N_balls: p.N_balls, d_ball: p.d_ball, D_pitch: p.D_pitch, alpha_contact: p.alpha_contact } },
+      { fn: 'mechanical_drive', params: { T_net: s.T_net || 0, L_shaft: p.L_shaft, G_shear: p.G_shear, J_polar: p.J_polar, F_belt: s.F_belt || 0, L_belt: p.L_belt, E_belt: p.E_belt, A_belt: p.A_belt, omega: s.omega || 0, eta_gear: p.eta_gear, mu_b: p.mu_b || 0.01, F_radial: p.F_radial, r_bearing: p.r_bearing, k_shaft: p.k_shaft, J_shaft: p.J_shaft } },
+      { fn: 'load_energy', params: { T_tension: s.T_tension || 0, L_span: p.L_span, E_fabric: p.E_fabric || 1e9, A_fabric: p.A_fabric || 0.001, F_nip: s.F_nip || 0, r_roller: p.r_roller || 0.1, w_fabric: p.w_fabric || 1, k_fabric: p.k_fabric, A_heat: p.A_heat, dT_dx: s.dT_dx || 0, r_nozzle: p.r_nozzle, gamma_ink: p.gamma_ink, C_piezo: p.C_piezo, V_drive: p.V_drive } }
+    ]);
+    s.I_env = resC.I_env;
+    s.delta_I = resB.delta_I;
+  }
+  if (s.fault_stall) s.I_env *= 2.5;
+  if (s.fault_overcurrent) s.I_env *= 1.5;
+  
+  if (typeof hist !== 'undefined' && hist.I_signature) {
+     hist.I_signature.push(s.I_env || 0); if (hist.I_signature.length > 300) hist.I_signature.shift();
+     if (typeof spark !== 'undefined' && spark.I_signature) { spark.I_signature.push(s.I_env || 0); if (spark.I_signature.length > 50) spark.I_signature.shift(); }
+  }
+
+  s.tickCount++;
+  s.simTime += DT;
+
+  pushHist(hist.queue_depth, s.queue_depth);
+  pushHist(hist.pid_output, s.pid_output);
+  pushHist(hist.throughput, s.throughput);
+  pushHist(hist.efficiency, s.efficiency);
+  pushSpark(spark.queue_depth, s.queue_depth);
+  pushSpark(spark.rho, s.rho);
+  pushSpark(spark.pid_error, s.pid_error);
+  pushSpark(spark.pid_output, s.pid_output);
+  pushSpark(spark.n_active, s.n_active);
+  pushSpark(spark.mu_eff, s.mu_eff);
+  pushSpark(spark.throughput, s.throughput);
+  pushSpark(spark.efficiency, s.efficiency);
+}
+
+function drawChart(canvasId, data, color, refLine, refColor) {
+  const canvas = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 6, right: 10, bottom: 20, left: 48 };
+  const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+
+  let dMin = Infinity, dMax = -Infinity;
+  for (const v of data) { if (v < dMin) dMin = v; if (v > dMax) dMax = v; }
+  if (!isFinite(dMin)) { dMin = 0; dMax = 1; }
+  if (dMin === dMax) { dMin -= 1; dMax += 1; }
+  const range = dMax - dMin;
+  dMin -= range * 0.1; dMax += range * 0.1;
+
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.08)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (i / 4) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    const val = dMax - (i / 4) * (dMax - dMin);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#6b7280';
+    ctx.font = '9px SF Mono, Menlo, monospace'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(val >= 100 ? 0 : val >= 1 ? 1 : 2), pad.left - 4, y + 3);
+  }
+
+  if (refLine !== undefined) {
+    const ry = pad.top + (1 - (refLine - dMin) / (dMax - dMin)) * ch;
+    ctx.strokeStyle = refColor || '#D85A30'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, ry); ctx.lineTo(pad.left + cw, ry); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (data.length < 2) return;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = pad.left + (i / (HIST_LEN - 1)) * cw;
+    const y = pad.top + (1 - (data[i] - dMin) / (dMax - dMin)) * ch;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function sparkSVG(data, color, w, h) {
+  if (data.length < 2) return '';
+  let lo = Infinity, hi = -Infinity;
+  for (const v of data) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const range = hi - lo || 1;
+  const pts = data.map((v, i) => `${(i/(data.length-1)*w).toFixed(1)},${(h-((v-lo)/range)*(h-2)-1).toFixed(1)}`);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+}
+
+const stateVars = [
+  { key:'queue_depth', sym:'Q(t)', name:'Queue Depth', unit:'jobs', color:'#378ADD', warn:15, crit:18 },
+  { key:'rho', sym:'ρ', name:'Utilization', unit:'', color:'#BA7517', warn:0.85, crit:0.95 },
+  { key:'pid_error', sym:'e(t)', name:'PID Error', unit:'', color:'#D85A30', warn:null, crit:null },
+  { key:'pid_output', sym:'u(t)', name:'PID Output', unit:'', color:'#1D9E75', warn:null, crit:null },
+  { key:'n_active', sym:'N_act', name:'Active Workers', unit:'', color:'#1D9E75', warn:null, crit:null },
+  { key:'mu_eff', sym:'μ_eff', name:'Effective Service', unit:'/min', color:'#BA7517', warn:null, crit:null },
+  { key:'throughput', sym:'Θ', name:'Throughput', unit:'/s', color:'#378ADD', warn:null, crit:null },
+  { key:'efficiency', sym:'η', name:'System Efficiency', unit:'', color:'#1D9E75', warn:null, crit:null },
+];
+
+function buildStateCards() {
+  document.getElementById('stateGrid').innerHTML = stateVars.map(sv =>
+    `<div class="state-card ok" id="sc_${sv.key}">
+      <div class="sc-left">
+        <div class="sc-sym">${sv.sym}</div>
+        <div class="sc-name">${sv.name}</div>
+        <div class="sc-val" id="scv_${sv.key}">—<span class="sc-unit">${sv.unit}</span></div>
+      </div>
+      <div class="sc-sparkline" id="sp_${sv.key}"></div>
+    </div>`
+  ).join('');
+}
+
+function updateStateCards() {
+  stateVars.forEach(sv => {
+    const val = state[sv.key];
+    const card = document.getElementById(`sc_${sv.key}`);
+    let status = 'ok';
+    if (sv.crit !== null && val > sv.crit) status = 'crit';
+    else if (sv.warn !== null && val > sv.warn) status = 'warn';
+    card.className = `state-card ${status}`;
+    document.getElementById(`scv_${sv.key}`).innerHTML = `${sigFig(val,4)}<span class="sc-unit">${sv.unit}</span>`;
+    document.getElementById(`sp_${sv.key}`).innerHTML = sparkSVG(spark[sv.key], sv.color, 64, 32);
+  });
+}
+
+function sigFig(n, sf) {
+  if (!Number.isFinite(n)) return '—';
+  if (n === 0) return '0';
+  return n.toFixed(Math.max(0, sf - 1 - Math.floor(Math.log10(Math.abs(n)))));
+}
+
+function updateSchematic() {
+  const s = state, p = PARAMS;
+
+  // Queue display
+  document.getElementById('sch_queue_val').textContent = s.queue_depth + ' / ' + p.q_max;
+  const qFrac = s.queue_depth / p.q_max;
+  document.getElementById('sch_queue_bar').setAttribute('width', (qFrac * 110).toFixed(1));
+  document.getElementById('sch_queue_bar').setAttribute('fill', qFrac > 0.9 ? 'var(--red)' : qFrac > 0.7 ? 'var(--amber)' : 'var(--accent)');
+
+  // PID values
+  document.getElementById('sch_pid_val').textContent = 'u = ' + s.pid_output.toFixed(3);
+  document.getElementById('sch_err_val').textContent = 'e = ' + s.pid_error.toFixed(1);
+
+  // Worker LEDs
+  const n_total = Math.round(p.n_workers);
+  for (let i = 1; i <= 15; i++) {
+    const led = document.getElementById('wled_' + i);
+    if (led) {
+      if (i > n_total) {
+        led.setAttribute('fill', 'var(--border)');
+        led.setAttribute('opacity', '0.3');
+      } else if (s.worker_status[i - 1] === 1) {
+        led.setAttribute('fill', 'var(--green)');
+        led.setAttribute('opacity', '1');
+      } else {
+        led.setAttribute('fill', 'var(--red)');
+        led.setAttribute('opacity', '1');
+      }
+    }
+  }
+
+  document.getElementById('sch_active_val').textContent = 'Active: ' + s.n_active + '/' + n_total;
+  document.getElementById('sch_lambda_val').textContent = 'λ = ' + p.lambda.toFixed(1) + '/min';
+  document.getElementById('sch_throughput_val').textContent = 'μ_eff = ' + s.mu_eff.toFixed(1) + '/min';
+
+  // Efficiency bar
+  const effPct = s.efficiency * 100;
+  document.getElementById('sch_eff_bar').setAttribute('width', (s.efficiency * 240).toFixed(1));
+  document.getElementById('sch_eff_bar').setAttribute('fill', effPct > 80 ? 'var(--green)' : effPct > 50 ? 'var(--amber)' : 'var(--red)');
+  document.getElementById('sch_eff_val').textContent = effPct.toFixed(1) + '%';
+}
+
+function formatTime(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateTopBar() {
+  document.getElementById('simTime').textContent = formatTime(state.simTime);
+  const pct = state.efficiency * 100;
+  document.getElementById('effProgress').style.width = pct.toFixed(1) + '%';
+  document.getElementById('effProgress').style.background = pct > 80 ? 'var(--green)' : pct > 50 ? 'var(--amber)' : 'var(--red)';
+  document.getElementById('effPct').textContent = pct.toFixed(1) + '%';
+}
+
+function updateChartValues() {
+  document.getElementById('ct_queue').textContent = state.queue_depth + ' jobs';
+  document.getElementById('ct_pid').textContent = state.pid_output.toFixed(3);
+  document.getElementById('ct_throughput').textContent = state.throughput.toFixed(2) + '/s';
+  document.getElementById('ct_eff').textContent = (state.efficiency * 100).toFixed(1) + '%';
+}
+
+const btnPlay = document.getElementById('btnPlay');
+btnPlay.addEventListener('click', () => {
+  state.running = !state.running;
+  btnPlay.textContent = state.running ? '⏸ Pause' : '▶ Play';
+  btnPlay.classList.toggle('primary', !state.running);
+  btnPlay.classList.toggle('danger', state.running);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.running = false;
+  btnPlay.textContent = '▶ Play'; btnPlay.classList.add('primary'); btnPlay.classList.remove('danger');
+  state.queue_depth = 0; state.rho = 0; state.pid_error = 0; state.pid_output = 0;
+  state.pid_integral = 0; state.pid_prev_error = 0;
+  state.n_active = Math.round(PARAMS.n_workers); state.n_faulted = 0;
+  state.mu_eff = 0; state.throughput = 0; state.efficiency = 0.95;
+  state.n_arrived = 0; state.n_served = 0;
+  state.total_arrived = 0; state.total_served = 0;
+  state.worker_status = new Array(15).fill(1);
+  state.tickCount = 0; state.simTime = 0;
+  hist.queue_depth=[]; hist.pid_output=[]; hist.throughput=[]; hist.efficiency=[];
+  Object.keys(spark).forEach(k => spark[k]=[]);
+});
+
+document.querySelectorAll('.speed-group .btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-group .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); state.speed = parseInt(btn.dataset.speed);
+  });
+});
+
+document.getElementById('formulaToggle').addEventListener('click', () => {
+  const body = document.getElementById('formulaBody');
+  const arrow = document.getElementById('formulaArrow');
+  const open = body.classList.toggle('open');
+  arrow.classList.toggle('open', open);
+});
+
+function render() {
+
+  const sigCanvas = document.getElementById('chart_signature');
+  if (sigCanvas && typeof drawChart === 'function' && hist.I_signature) {
+     drawChart('chart_signature', hist.I_signature, '#BA7517');
+     const ct_I_sig = document.getElementById('ct_I_sig');
+     if (ct_I_sig) ct_I_sig.textContent = (state.I_env || 0).toFixed(2) + ' A';
+  }
+
+  drawChart('chart_queue', hist.queue_depth, '#378ADD', PARAMS.q_max, '#D85A30');
+  drawChart('chart_pid', hist.pid_output, '#1D9E75');
+  drawChart('chart_throughput', hist.throughput, '#BA7517');
+  drawChart('chart_eff', hist.efficiency, '#D85A30', 0.9, '#1D9E75');
+  updateSchematic(); updateStateCards(); updateTopBar(); updateChartValues();
+}
+
+async function loop() {
+  if (state.running) {
+    for (let i = 0; i < state.speed; i++) {
+      await tick();
+    }
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+initWorkerPool();
+buildStateCards();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

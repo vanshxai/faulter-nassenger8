@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nassenger 8 Digital Twin - Worker 9: Head Height Adjustment</title>
+<style>
+:root {
+  --bg: #f5f5f5; --bg2: #ffffff; --bg3: #e8e8e8; --text: #222; --text2: #555;
+  --border: #ccc; --accent: #378ADD; --accent2: #BA7517; --accent3: #D85A30; --accent4: #1D9E75;
+  --card-bg: #fff; --shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+[data-theme="dark"] {
+  --bg: #1a1a2e; --bg2: #16213e; --bg3: #0f3460; --text: #eee; --text2: #aaa;
+  --border: #444; --card-bg: #16213e; --shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.topbar h1 { font-size: 16px; margin-right: auto; }
+.btn { padding: 6px 14px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); border-radius: 4px; cursor: pointer; font-size: 13px; }
+.btn:hover { background: var(--accent); color: #fff; }
+.speed-ctrl { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.speed-ctrl input { width: 80px; }
+.layout { display: grid; grid-template-columns: 220px 1fr 260px; gap: 8px; padding: 8px; height: calc(100vh - 48px); }
+.left-panel, .right-panel { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.center-panel { display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; box-shadow: var(--shadow); }
+.card h3 { font-size: 13px; margin-bottom: 6px; color: var(--text2); }
+.slider-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
+.slider-row label { flex: 1; }
+.slider-row input[type=range] { flex: 2; margin: 0 6px; }
+.slider-row .val { width: 50px; text-align: right; font-family: monospace; }
+.svg-container { flex: 1; min-height: 200px; }
+.svg-container svg { width: 100%; height: 100%; }
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chart-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
+.chart-box h4 { font-size: 11px; margin-bottom: 4px; color: var(--text2); }
+.chart-box canvas { width: 100%; height: 100px; display: block; }
+.formula-chain { font-size: 11px; font-family: monospace; background: var(--bg3); padding: 6px; border-radius: 4px; line-height: 1.6; }
+.formula-chain .step { color: var(--accent); font-weight: bold; }
+.state-card { font-size: 12px; }
+.state-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.state-row:last-child { border: none; }
+.state-label { color: var(--text2); }
+.state-value { font-family: monospace; font-weight: bold; }
+.sparkline { width: 100%; height: 30px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Nassenger 8 - Worker 9: Head Height Adjustment</h1>
+  <button class="btn" id="playBtn">Play</button>
+  <button class="btn" id="pauseBtn">Pause</button>
+  <button class="btn" id="resetBtn">Reset</button>
+  <div class="speed-ctrl">
+    <label>Speed:</label>
+    <input type="range" id="speedSlider" min="1" max="20" value="5">
+    <span id="speedVal">5x</span>
+  </div>
+  <button class="btn" id="themeBtn">Dark</button>
+</div>
+<div class="layout">
+  <div class="left-panel">
+    <div class="card">
+      <h3>Parameters</h3>
+      <div id="sliders"></div>
+    </div>
+    <div class="card">
+      <h3>Formula Chain (8 steps)</h3>
+      <div class="formula-chain" id="formulas"></div>
+    </div>
+  </div>
+  <div class="center-panel">
+    <div class="card svg-container" id="svgContainer"></div>
+    <div class="charts-grid">
+      <div class="chart-box"><h4>Head Height (mm)</h4><canvas id="chart0"></canvas></div>
+      <div class="chart-box"><h4>Height Error (mm)</h4><canvas id="chart1"></canvas></div>
+      <div class="chart-box"><h4>Stepper Current (A)</h4><canvas id="chart2"></canvas></div>
+      <div class="chart-box"><h4>Vertical Position (mm)</h4><canvas id="chart3"></canvas></div>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="card state-card"><h3>State Variables</h3><div id="stateVars"></div></div>
+    <div class="card state-card"><h3>PID Controller</h3><div id="pidInfo"></div></div>
+    <div class="card state-card"><h3>Mechanical Load</h3><div id="mechLoad"></div></div>
+  </div>
+</div>
+
+<script>
+const DT = 0.01;
+const HIST_LEN = 300;
+const SPARK_LEN = 50;
+
+const PARAM_DEFS = [
+  { id: 'lead_screw_pitch', label: 'Lead Screw Pitch (mm)', min: 0.5, max: 10, val: 2, step: 0.5 },
+  { id: 'stepper_Kt', label: 'Stepper Kt (Nm/A)', min: 0.1, max: 5, val: 1.2, step: 0.1 },
+  { id: 'carriage_mass', label: 'Carriage Mass (kg)', min: 0.5, max: 20, val: 5, step: 0.5 },
+  { id: 'friction_coeff', label: 'Friction Coeff', min: 0.01, max: 1, val: 0.15, step: 0.01 },
+  { id: 'nominal_gap', label: 'Nominal Gap (mm)', min: 0.5, max: 5, val: 2, step: 0.1 },
+  { id: 'Kp', label: 'PID Kp', min: 0.1, max: 50, val: 10, step: 0.5 },
+  { id: 'Ki', label: 'PID Ki', min: 0.01, max: 10, val: 1, step: 0.1 },
+  { id: 'Kd', label: 'PID Kd', min: 0.01, max: 10, val: 2, step: 0.1 }
+];
+
+let params = {};
+PARAM_DEFS.forEach(p => params[p.id] = p.val);
+
+let state = {
+  I_env: 0, delta_I: 0, fault_stall: false, fault_overcurrent: false,
+  h_current: params.nominal_gap,
+  v_vertical: 0,
+  T_stepper: 0,
+  F_axial: 0,
+  h_measured: params.nominal_gap,
+  height_error: 0,
+  PID_output: 0,
+  steps_remaining: 0,
+  integral_error: 0,
+  prev_error: 0,
+  target_gap: params.nominal_gap,
+  history: { h_current: [], height_error: [], PID_output: [], v_vertical: [] },
+  sparklines: { h_current: [], height_error: [], PID_output: [], v_vertical: [] }
+};
+
+let running = false, speed = 5, simTime = 0;
+
+const WORKER_CODE = `
+const DT = 0.01;
+const g = 9.81;
+function compute(p, st, dt) {
+  let compensation = Math.sin(st.simTime * 0.05) * 0.3;
+  let h_target = p.nominal_gap + compensation;
+  let lead = p.lead_screw_pitch / 1000;
+  let h_current = st.h_current;
+  let v = st.v_vertical;
+  let steps = (h_target - h_current) / lead * 200;
+  let err = h_target - h_current;
+  let integral = st.integral_error + err * dt;
+  let deriv = (err - st.prev_error) / dt;
+  let PID_out = p.Kp * err + p.Ki * integral + p.Kd * deriv;
+  let I_cmd = Math.max(-2, Math.min(2, PID_out));
+  let T = p.stepper_Kt * I_cmd;
+  let eta_screw = 0.8;
+  let F_axial = (T * 2 * Math.PI) / (lead * eta_screw);
+  let m = p.carriage_mass;
+  let F_friction = p.friction_coeff * m * g * Math.sign(v);
+  if (Math.abs(v) < 0.001) F_friction = p.friction_coeff * m * g * Math.sign(F_axial);
+  let F_net = F_axial - m * g - F_friction;
+  let a = F_net / m;
+  v = v + a * dt;
+  v = Math.max(-5, Math.min(5, v));
+  h_current = h_current + v * dt;
+  h_current = Math.max(0.5, Math.min(10, h_current));
+  let noise_res = 0.01 * (Math.random() - 0.5);
+  let h_measured = h_current + noise_res;
+  let steps_rem = Math.abs((h_target - h_measured) / lead);
+  
+  // ── LAYER A-E: Energy Chain (Sync) ──
+  let V_bus = p.V_line * 1.35 - (st.I_load || 0) * p.R_bus;
+  let D_pwm = p.V_input ? p.V_input / (p.V_line * 1.35 + 1e-6) : 0.5;
+  let V_back_emf = (p.K_e||0.1) * (st.omega || 0);
+  
+  st.delta_I = (V_bus - V_back_emf) * D_pwm * (1/p.f_sw) / (p.L_motor||0.05);
+  st.I_env = ((p.T_load||10) / ((p.K_t||0.1) * p.efficiency));
+  if (st.fault_stall) st.I_env *= 2.5;
+  if (st.fault_overcurrent) st.I_env *= 1.5;
+
+  return {
+    h_current, v_vertical: v, T_stepper: T, F_axial,
+    h_measured, height_error: err, PID_output: PID_out, steps_remaining: steps_rem,
+    integral_error: integral, prev_error: err, target_gap: h_target
+  };
+}
+self.onmessage = e => { if (e.data.type === 'step') { let res = compute(e.data.params, e.data.state, DT); self.postMessage({ type: 'result', state: res }); } };
+`;
+
+let workers = [];
+
+document.getElementById('chk_stall')?.addEventListener('change', e => state.fault_stall = e.target.checked);
+document.getElementById('chk_overcurrent')?.addEventListener('change', e => state.fault_overcurrent = e.target.checked);
+
+function initWorkers() {
+  for (let i = 0; i < 4; i++) {
+    const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+    const w = new Worker(URL.createObjectURL(blob));
+    w.onmessage = e => { if (e.data.type === 'result') { updateState(e.data.state); } };
+    workers.push(w);
+  }
+}
+
+function stepSimulation() {
+  let idx = simTime % workers.length;
+  workers[idx].postMessage({ type: 'step', params, state: { ...state, simTime } });
+}
+
+function updateState(newState) {
+  state.h_current = newState.h_current;
+  state.v_vertical = newState.v_vertical;
+  state.T_stepper = newState.T_stepper;
+  state.F_axial = newState.F_axial;
+  state.h_measured = newState.h_measured;
+  state.height_error = newState.height_error;
+  state.PID_output = newState.PID_output;
+  state.steps_remaining = newState.steps_remaining;
+  state.integral_error = newState.integral_error;
+  state.prev_error = newState.prev_error;
+  state.target_gap = newState.target_gap;
+  pushHistory();
+  simTime++;
+  updateUI();
+}
+
+function pushHistory() {
+  history.I_signature.push(state.I_env || 0); if(history.I_signature.length>60) history.I_signature.shift();
+  ['h_current','height_error','PID_output','v_vertical'].forEach(k => {
+    state.history[k].push(state[k]);
+    if (state.history[k].length > HIST_LEN) state.history[k].shift();
+    state.sparklines[k].push(state[k]);
+    if (state.sparklines[k].length > SPARK_LEN) state.sparklines[k].shift();
+  });
+}
+
+function buildSliders() {
+  const cont = document.getElementById('sliders');
+  cont.innerHTML = PARAM_DEFS.map(p => `
+    <div class="slider-row">
+      <label>${p.label}</label>
+      <input type="range" min="${p.min}" max="${p.max}" step="${p.step || 1}" value="${p.val}" data-id="${p.id}">
+      <span class="val" data-val="${p.id}">${p.val}</span>
+    </div>
+  `).join('');
+  cont.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      let id = e.target.dataset.id;
+      let v = parseFloat(e.target.value);
+      params[id] = v;
+      let decimals = id === 'lead_screw_pitch' || id === 'nominal_gap' || id === 'stepper_Kt' || id === 'carriage_mass' ? 1 :
+                     id === 'friction_coeff' || id === 'Ki' || id === 'Kd' ? 2 : 1;
+      cont.querySelector(`[data-val="${id}"]`).textContent = v.toFixed(decimals);
+    });
+  });
+}
+
+function buildFormulas() {
+  document.getElementById('formulas').innerHTML = `
+    <span class="step">1.</span> h_target = nominal + comp<br>
+    <span class="step">2.</span> steps = (h_t - h_c)/pitch<br>
+    <span class="step">3.</span> T = Kt * I<br>
+    <span class="step">4.</span> F_axial = T*2pi/(lead*eta)<br>
+    <span class="step">5.</span> F_net = F_ax - m*g - F_fric<br>
+    <span class="step">6.</span> dh/dt = v, dv/dt = F/m<br>
+    <span class="step">7.</span> h_meas = h + noise<br>
+    <span class="step">8.</span> PID -> current cmd<br>
+  `;
+}
+
+function drawSVG() {
+  let gapPx = ((state.h_current / 10) * 120);
+  let headY = 30;
+  let fabricY = 30 + gapPx + 40;
+  const svg = `
+  <svg viewBox="0 0 560 300" xmlns="http://www.w3.org/2000/svg">
+    <rect width="560" height="300" fill="${getComputedStyle(document.body).getPropertyValue('--bg2')}"/>
+    <!-- Stepper motor -->
+    <rect x="50" y="20" width="50" height="50" rx="6" fill="#555"/>
+    <circle cx="75" cy="45" r="15" fill="#777"/>
+    <circle cx="75" cy="45" r="8" fill="#999"/>
+    <text x="55" y="85" fill="var(--text)" font-size="9">STEPPER</text>
+    <!-- Lead screw -->
+    <line x1="75" y1="70" x2="75" y2="${headY + 5}" stroke="#888" stroke-width="6" stroke-dasharray="4,2"/>
+    <text x="90" y="120" fill="var(--text2)" font-size="9">Lead Screw</text>
+    <text x="90" y="132" fill="var(--text2)" font-size="8">${params.lead_screw_pitch}mm pitch</text>
+    <!-- Carriage / print head -->
+    <rect x="30" y="${headY}" width="180" height="35" rx="4" fill="var(--accent)" opacity="0.4"/>
+    <text x="50" y="${headY + 22}" fill="var(--accent)" font-size="10">PRINT HEAD</text>
+    <!-- Gap measurement arrow -->
+    <line x1="230" y1="${headY + 35}" x2="230" y2="${fabricY}" stroke="var(--accent3)" stroke-width="2"/>
+    <polygon points="225,${headY + 40} 235,${headY + 40} 230,${headY + 35}" fill="var(--accent3)"/>
+    <polygon points="225,${fabricY - 5} 235,${fabricY - 5} 230,${fabricY}" fill="var(--accent3)"/>
+    <text x="240" y="${(headY + 35 + fabricY) / 2}" fill="var(--accent3)" font-size="11">${state.h_current.toFixed(2)}mm</text>
+    <!-- Fabric -->
+    <rect x="20" y="${fabricY}" width="220" height="20" rx="2" fill="#8B7355" opacity="0.6"/>
+    <text x="60" y="${fabricY + 14}" fill="#fff" font-size="9">FABRIC</text>
+    <!-- Vertical guide rail -->
+    <line x1="20" y1="${headY}" x2="20" y2="${fabricY + 20}" stroke="#666" stroke-width="3"/>
+    <text x="5" y="180" fill="var(--text2)" font-size="8" transform="rotate(-90 5 180)">GUIDE RAIL</text>
+    <!-- Encoder -->
+    <rect x="30" y="${headY - 18}" width="35" height="15" rx="3" fill="var(--accent4)" opacity="0.4"/>
+    <text x="33" y="${headY - 8}" fill="var(--accent4)" font-size="8">ENC</text>
+    <!-- Info panel -->
+    <rect x="280" y="20" width="260" height="60" rx="6" fill="var(--accent)" opacity="0.2"/>
+    <text x="290" y="40" fill="var(--accent)" font-size="10">Target: ${state.target_gap.toFixed(2)}mm</text>
+    <text x="290" y="58" fill="var(--accent)" font-size="10">Actual: ${state.h_current.toFixed(2)}mm</text>
+    <text x="290" y="76" fill="var(--accent)" font-size="10">Error: ${state.height_error.toFixed(3)}mm</text>
+    <rect x="280" y="95" width="260" height="60" rx="6" fill="var(--accent2)" opacity="0.2"/>
+    <text x="290" y="115" fill="var(--accent2)" font-size="10">Torque: ${state.T_stepper.toFixed(2)} Nm</text>
+    <text x="290" y="133" fill="var(--accent2)" font-size="10">F_axial: ${(state.F_axial / 1000).toFixed(2)} kN</text>
+    <text x="290" y="151" fill="var(--accent2)" font-size="10">Velocity: ${state.v_vertical.toFixed(3)} m/s</text>
+    <rect x="280" y="170" width="260" height="60" rx="6" fill="var(--accent3)" opacity="0.2"/>
+    <text x="290" y="190" fill="var(--accent3)" font-size="10">PID Output: ${state.PID_output.toFixed(3)}</text>
+    <text x="290" y="208" fill="var(--accent3)" font-size="10">Steps Left: ${state.steps_remaining.toFixed(0)}</text>
+    <text x="290" y="226" fill="var(--accent3)" font-size="10">I_cmd: ${(state.PID_output * 0.1).toFixed(2)} A</text>
+    <!-- Status -->
+    <rect x="280" y="245" width="260" height="40" rx="6" fill="var(--accent4)" opacity="0.2"/>
+    <text x="290" y="262" fill="var(--accent4)" font-size="9">Measured: ${state.h_measured.toFixed(3)}mm</text>
+    <text x="290" y="278" fill="var(--accent4)" font-size="9">Noise: +/-0.01mm</text>
+  </svg>`;
+  document.getElementById('svgContainer').innerHTML = svg;
+}
+
+
+  const sigCanvas = document.getElementById('chart_signature');
+  if (sigCanvas && typeof drawChart === 'function' && history.I_signature) {
+     drawChart('chart_signature', history.I_signature, '#BA7517');
+     const ct_I_sig = document.getElementById('ct_I_sig');
+     if (ct_I_sig) ct_I_sig.textContent = (state.I_env || 0).toFixed(2) + ' A';
+  }
+
+function drawChart(canvasId, data, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  canvas.width = w * 2;
+  canvas.height = h * 2;
+  ctx.scale(2, 2);
+  ctx.clearRect(0, 0, w, h);
+  if (data.length < 2) return;
+  let min = Math.min(...data);
+  let max = Math.max(...data);
+  let range = max - min || 1;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    let x = (i / (HIST_LEN - 1)) * w;
+    let y = h - ((v - min) / range) * (h - 10) - 5;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.1;
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function updateStateVars() {
+  const vars = [
+    { label: 'h_current', value: state.h_current.toFixed(3) + ' mm' },
+    { label: 'v_vertical', value: state.v_vertical.toFixed(4) + ' m/s' },
+    { label: 'T_stepper', value: state.T_stepper.toFixed(3) + ' Nm' },
+    { label: 'F_axial', value: (state.F_axial / 1000).toFixed(3) + ' kN' },
+    { label: 'h_measured', value: state.h_measured.toFixed(3) + ' mm' },
+    { label: 'height_error', value: state.height_error.toFixed(4) + ' mm' },
+    { label: 'PID_output', value: state.PID_output.toFixed(3) },
+    { label: 'steps_rem', value: state.steps_remaining.toFixed(0) }
+  ];
+  document.getElementById('stateVars').innerHTML = vars.map(v =>
+    `<div class="state-row"><span class="state-label">${v.label}</span><span class="state-value">${v.value}</span></div>`
+  ).join('');
+}
+
+function updatePIDInfo() {
+  let errColor = Math.abs(state.height_error) < 0.05 ? 'var(--accent4)' : Math.abs(state.height_error) < 0.2 ? 'var(--accent2)' : 'var(--accent3)';
+  document.getElementById('pidInfo').innerHTML = `
+    <div class="state-row"><span class="state-label">Kp</span><span class="state-value">${params.Kp}</span></div>
+    <div class="state-row"><span class="state-label">Ki</span><span class="state-value">${params.Ki}</span></div>
+    <div class="state-row"><span class="state-label">Kd</span><span class="state-value">${params.Kd}</span></div>
+    <div class="state-row"><span class="state-label">Integral</span><span class="state-value">${state.integral_error.toFixed(3)}</span></div>
+    <div class="state-row"><span class="state-label">Error</span><span class="state-value" style="color:${errColor}">${state.height_error.toFixed(4)}</span></div>
+  `;
+}
+
+function updateMechLoad() {
+  let m = params.carriage_mass;
+  let Fg = m * 9.81;
+  let Ff = params.friction_coeff * Fg;
+  document.getElementById('mechLoad').innerHTML = `
+    <div class="state-row"><span class="state-label">Mass</span><span class="state-value">${m} kg</span></div>
+    <div class="state-row"><span class="state-label">F_gravity</span><span class="state-value">${Fg.toFixed(1)} N</span></div>
+    <div class="state-row"><span class="state-label">F_friction</span><span class="state-value">${Ff.toFixed(1)} N</span></div>
+    <div class="state-row"><span class="state-label">F_net</span><span class="state-value">${(state.F_axial - Fg - Ff).toFixed(1)} N</span></div>
+    <div class="state-row"><span class="state-label">Lead</span><span class="state-value">${params.lead_screw_pitch} mm</span></div>
+  `;
+}
+
+function updateUI() {
+  drawSVG();
+  drawChart('chart0', state.history.h_current, '#378ADD');
+  drawChart('chart1', state.history.height_error, '#BA7517');
+  drawChart('chart2', state.history.PID_output, '#D85A30');
+  drawChart('chart3', state.history.v_vertical, '#1D9E75');
+  updateStateVars();
+  updatePIDInfo();
+  updateMechLoad();
+}
+
+let simInterval = null;
+function startSim() {
+  if (simInterval) return;
+  simInterval = setInterval(() => { for (let i = 0; i < speed; i++) stepSimulation(); }, 100);
+}
+function stopSim() { clearInterval(simInterval); simInterval = null; }
+
+document.getElementById('playBtn').onclick = () => { running = true; startSim(); };
+document.getElementById('pauseBtn').onclick = () => { running = false; stopSim(); };
+document.getElementById('resetBtn').onclick = () => {
+  stopSim(); running = false; simTime = 0;
+  state.h_current = params.nominal_gap; state.v_vertical = 0; state.T_stepper = 0;
+  state.F_axial = 0; state.h_measured = params.nominal_gap; state.height_error = 0;
+  state.PID_output = 0; state.steps_remaining = 0; state.integral_error = 0;
+  state.prev_error = 0; state.target_gap = params.nominal_gap;
+  state.history = { h_current: [], height_error: [], PID_output: [], v_vertical: [] };
+  state.sparklines = { h_current: [], height_error: [], PID_output: [], v_vertical: [] };
+  updateUI();
+};
+document.getElementById('speedSlider').oninput = e => { speed = parseInt(e.target.value); document.getElementById('speedVal').textContent = speed + 'x'; };
+document.getElementById('themeBtn').onclick = () => {
+  let dark = document.body.getAttribute('data-theme') === 'dark';
+  document.body.setAttribute('data-theme', dark ? '' : 'dark');
+  document.getElementById('themeBtn').textContent = dark ? 'Dark' : 'Light';
+};
+
+buildSliders();
+buildFormulas();
+initWorkers();
+updateUI();
+</script>
+</body>
+</html>

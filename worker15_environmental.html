@@ -1,0 +1,1175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker 15 — Environmental Sensing | Nassenger 8 Digital Twin</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-alt: #f7f8fa;
+  --text: #1a1d23;
+  --text-muted: #6b7280;
+  --border: #e2e5ea;
+  --accent: #378ADD;
+  --accent-soft: rgba(55,138,221,0.1);
+  --green: #1D9E75;
+  --amber: #BA7517;
+  --red: #D85A30;
+  --chart-grid: rgba(0,0,0,0.08);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-alt: #22252f;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border: #2d3040;
+    --accent: #5a9fef;
+    --accent-soft: rgba(90,159,239,0.12);
+    --chart-grid: rgba(255,255,255,0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.3);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar h1 span {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.sim-time {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn:hover { background: var(--surface-alt); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.9; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: var(--red); color: #fff; }
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.speed-group {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.speed-group .btn {
+  border: none;
+  border-radius: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.speed-group .btn + .btn { border-left: 1px solid var(--border); }
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.progress-bar {
+  width: 100px;
+  height: 6px;
+  background: var(--surface-alt);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.main {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  min-height: calc(100vh - 52px);
+  align-items: flex-start;
+}
+
+.col-left, .col-right {
+  flex: 0 0 280px;
+  min-width: 0;
+}
+
+.col-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.card-body { padding: 12px 14px; }
+
+.slider-group { margin-bottom: 10px; }
+.slider-group:last-child { margin-bottom: 0; }
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.slider-label .name { color: var(--text); font-weight: 500; }
+.slider-label .val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.state-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.state-card.ok { border-color: var(--green); }
+.state-card.warn { border-color: var(--amber); background: rgba(186,117,23,0.06); }
+.state-card.crit { border-color: var(--red); background: rgba(216,90,48,0.06); }
+
+.state-card .sc-left { min-width: 0; }
+.state-card .sc-sym {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.state-card .sc-name { font-size: 11px; color: var(--text-muted); }
+.state-card .sc-val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.state-card .sc-unit { font-size: 10px; color: var(--text-muted); margin-left: 2px; font-weight: 400; }
+.state-card .sc-sparkline { width: 64px; height: 32px; flex-shrink: 0; }
+
+.schematic-wrap { padding: 12px; display: flex; justify-content: center; }
+.schematic-wrap svg { max-width: 100%; height: auto; }
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.chart-title {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+.chart-title .ct-value {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chart-canvas-wrap { padding: 6px 8px 8px; position: relative; }
+.chart-canvas-wrap canvas { width: 100%; display: block; }
+
+.parallel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  margin-left: 8px;
+}
+
+.formula-chain-toggle {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.formula-chain-toggle .arrow { transition: transform 0.2s ease; font-size: 10px; }
+.formula-chain-toggle .arrow.open { transform: rotate(90deg); }
+
+.formula-chain-body {
+  display: none;
+  padding: 0 14px 14px;
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", monospace;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.formula-chain-body.open { display: block; }
+
+.formula-step {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.formula-step:last-child { border-bottom: none; }
+
+.formula-step .step-num { font-weight: 700; color: var(--accent); margin-right: 6px; }
+
+.formula-step .step-title {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+}
+
+.formula-step .step-eq { color: var(--accent); font-size: 11px; }
+
+.formula-step .parallel-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.formula-step .sequential-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(55,138,221,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(55,138,221,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media (max-width: 900px) {
+  .main { flex-direction: column; }
+  .col-left, .col-right { flex: none; width: 100%; }
+  .charts-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Worker 15 — Environmental Sensing<span>Nassenger 8 Digital Twin</span></h1>
+    <div class="sim-time" id="simTime">00:00:00</div>
+    <button class="btn primary" id="btnPlay">▶ Play</button>
+    <button class="btn" id="btnReset">↺ Reset</button>
+    <div class="speed-group">
+      <button class="btn active" data-speed="1">1×</button>
+      <button class="btn" data-speed="5">5×</button>
+      <button class="btn" data-speed="10">10×</button>
+      <button class="btn" data-speed="50">50×</button>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <span>Compliance:</span>
+    <div class="progress-bar"><div class="progress-fill" id="compProgress"></div></div>
+    <span id="compPct">100%</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: Parameters -->
+  <div class="col-left">
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Operating Envelope (ISO)</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">T Min</span><span class="val" id="v_t_min">15.0 °C</span></div>
+          <input type="range" id="s_t_min" min="5" max="25" step="0.5" value="15">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">T Max</span><span class="val" id="v_t_max">30.0 °C</span></div>
+          <input type="range" id="s_t_max" min="25" max="45" step="0.5" value="30">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">RH Min</span><span class="val" id="v_rh_min">40 %</span></div>
+          <input type="range" id="s_rh_min" min="20" max="50" step="1" value="40">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">RH Max</span><span class="val" id="v_rh_max">70 %</span></div>
+          <input type="range" id="s_rh_max" min="60" max="90" step="1" value="70">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Dew Point Limit</span><span class="val" id="v_dp_limit">12.0 °C</span></div>
+          <input type="range" id="s_dp_limit" min="5" max="20" step="0.5" value="12">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Sensor Characteristics</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">T Sensor Noise</span><span class="val" id="v_noise_t">0.20 °C</span></div>
+          <input type="range" id="s_noise_t" min="0.05" max="1" step="0.05" value="0.2">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">RH Sensor Noise</span><span class="val" id="v_noise_rh">1.0 %</span></div>
+          <input type="range" id="s_noise_rh" min="0.2" max="5" step="0.2" value="1">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Drift Rate</span><span class="val" id="v_drift">0.010 %/day</span></div>
+          <input type="range" id="s_drift" min="0" max="0.1" step="0.001" value="0.01">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Alert & Compliance</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Hysteresis</span><span class="val" id="v_hyst">2.0</span></div>
+          <input type="range" id="s_hyst" min="0.5" max="5" step="0.1" value="2">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Alert Sensitivity</span><span class="val" id="v_sens">0.80</span></div>
+          <input type="range" id="s_sens" min="0.1" max="1" step="0.05" value="0.8">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Compliance Weight T:RH</span><span class="val" id="v_w_t">0.60 : 0.40</span></div>
+          <input type="range" id="s_w_t" min="0.3" max="0.8" step="0.05" value="0.6">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Visualisation -->
+  <div class="col-center">
+
+    <!-- Schematic -->
+    <div class="card">
+      <div class="card-header">Schematic — Worker 15 Environmental Sensing</div>
+      <div class="schematic-wrap">
+        <svg id="schematic" viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--chart-grid)" stroke-width="0.5"/>
+            </pattern>
+            <radialGradient id="gaugeGrad" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="var(--surface-alt)"/>
+              <stop offset="100%" stop-color="var(--surface)"/>
+            </radialGradient>
+          </defs>
+          <rect width="600" height="240" fill="url(#grid)" opacity="0.4"/>
+
+          <!-- Ambient conditions gauges -->
+          <g id="sch_temp_gauge">
+            <circle cx="150" cy="120" r="35" fill="url(#gaugeGrad)" stroke="var(--accent)" stroke-width="2"/>
+            <circle id="temp_arc" cx="150" cy="120" r="25" fill="none" stroke="var(--accent)" stroke-width="3" stroke-dasharray="157 157" stroke-dashoffset="78.5"/>
+            <text id="sch_t_val" x="150" y="118" font-size="14" fill="var(--accent)" text-anchor="middle" font-weight="700" font-family="SF Mono, monospace">22°C</text>
+            <text x="150" y="138" font-size="8" fill="var(--text-muted)" text-anchor="middle">Temperature</text>
+            <path id="temp_needle" d="M150 95 L153 120 L147 120 Z" fill="var(--accent)" transform="rotate(0 150 120)"/>
+          </g>
+
+          <g id="sch_rh_gauge">
+            <circle cx="300" cy="120" r="35" fill="url(#gaugeGrad)" stroke="var(--green)" stroke-width="2"/>
+            <circle id="rh_arc" cx="300" cy="120" r="25" fill="none" stroke="var(--green)" stroke-width="3" stroke-dasharray="157 157" stroke-dashoffset="47"/>
+            <text id="sch_rh_val" x="300" y="118" font-size="14" fill="var(--green)" text-anchor="middle" font-weight="700" font-family="SF Mono, monospace">55%</text>
+            <text x="300" y="138" font-size="8" fill="var(--text-muted)" text-anchor="middle">Humidity</text>
+            <path id="rh_needle" d="M300 95 L303 120 L297 120 Z" fill="var(--green)" transform="rotate(0 300 120)"/>
+          </g>
+
+          <g id="sch_dp_gauge">
+            <circle cx="450" cy="120" r="35" fill="url(#gaugeGrad)" stroke="var(--amber)" stroke-width="2"/>
+            <circle id="dp_arc" cx="450" cy="120" r="25" fill="none" stroke="var(--amber)" stroke-width="3" stroke-dasharray="157 157" stroke-dashoffset="98"/>
+            <text id="sch_dp_val" x="450" y="118" font-size="14" fill="var(--amber)" text-anchor="middle" font-weight="700" font-family="SF Mono, monospace">10°C</text>
+            <text x="450" y="138" font-size="8" fill="var(--text-muted)" text-anchor="middle">Dew Point</text>
+            <path id="dp_needle" d="M450 95 L453 120 L447 120 Z" fill="var(--amber)" transform="rotate(0 450 120)"/>
+          </g>
+
+          <!-- Alert lights -->
+          <circle cx="150" cy="200" r="12" fill="#ddd" stroke="var(--border)" stroke-width="2" id="alert_t"/>
+          <circle cx="300" cy="200" r="12" fill="#ddd" stroke="var(--border)" stroke-width="2" id="alert_rh"/>
+          <circle cx="450" cy="200" r="12" fill="#ddd" stroke="var(--border)" stroke-width="2" id="alert_dp"/>
+          <text x="150" y="225" font-size="7" fill="var(--text-muted)" text-anchor="middle" font-weight="600">T Alert</text>
+          <text x="300" y="225" font-size="7" fill="var(--text-muted)" text-anchor="middle" font-weight="600">RH Alert</text>
+          <text x="450" y="225" font-size="7" fill="var(--text-muted)" text-anchor="middle" font-weight="600">DP Alert</text>
+
+          <!-- Envelope box -->
+          <rect x="80" y="30" width="440" height="45" fill="none" stroke="var(--border)" stroke-width="1.5" stroke-dasharray="5,5"/>
+          <text x="300" y="48" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-weight="600">ISO Operating Envelope: 15–30°C | 40–70%RH</text>
+          <text x="300" y="65" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-weight="600" id="sch_comp_val">Compliance: — %</text>
+
+        </svg>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-title">Current Signature i(t) <span class="ct-value" id="ct_I_sig" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_signature" height="130"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Ambient Temperature <span class="ct-value" id="ct_Tamb" style="color:#378ADD">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_temp" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Relative Humidity <span class="ct-value" id="ct_RH" style="color:#1D9E75">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_rh" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Dew Point <span class="ct-value" id="ct_dew" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_dew" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Alert Level <span class="ct-value" id="ct_alert" style="color:#D85A30">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_alert" height="130"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Formula Chain -->
+    <div class="card">
+      <div class="formula-chain-toggle" id="formulaToggle">
+        <span>Formula Chain (8 steps, sensor fusion) <span class="parallel-badge">⚡ Parallel</span></span>
+        <span class="arrow" id="formulaArrow">▶</span>
+      </div>
+      <div class="formula-chain-body" id="formulaBody">
+        <div class="formula-step">
+          <span class="step-title">Step 1 — Sensor Readings + Noise <span class="parallel-tag">3 parallel</span></span>
+          <span class="step-eq">T_meas = T_true + N(0,σ_T) | RH_meas = RH_true + N(0,σ_RH) | DP_meas = DP_true + N(0,σ_DP)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 2 — Dew Point Calculation <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">DP = 237.7·α/(17.27−α) | α = 17.27·T/(237.7+T) + ln(RH/100)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 3 — Envelope Violation Deltas <span class="parallel-tag">3 parallel</span></span>
+          <span class="step-eq">ΔT = max(T−T_max, T_min−T, 0) | ΔRH = max(RH−RH_max, RH_min−RH, 0) | ΔDP = max(DP−DP_limit, 0)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 4 — Hysteresis Filter <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">state_new = Δ > hyst ? 1 : Δ < 0 ? 0 : state_prev</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 5 — Weighted Severity Score <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">alert_level = w_T·ΔT_norm + w_RH·ΔRH_norm + w_DP·ΔDP_norm</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 6 — Sensor Drift Accumulation <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">drift_T += drift_rate · dt | drift_RH += drift_rate · dt</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 7 — Exponential Compliance Decay <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">compliance = compliance · e^(−λ·alert_level·dt) + (1−state)·growth_rate</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 8 — Uptime & Poisson Alerts <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">uptime = 1 − (1 − compliance)^τ | alert_count ~ Poisson(λ·alert_level·dt)</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: State Readouts -->
+  <div class="col-right">
+
+    <div class="card" style="margin-top:10px;">
+      <div class="card-header">Energy Fault Injection</div>
+      <div class="card-body" style="padding:10px; display:flex; gap:10px;">
+        <label style="font-size:11px;"><input type="checkbox" id="chk_stall"> Stall (I > 2.5x)</label>
+        <label style="font-size:11px;"><input type="checkbox" id="chk_overcurrent"> Overcurrent (1.5x)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Live State Variables</div>
+      <div class="card-body">
+        <div class="state-grid" id="stateGrid"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const WORKER_CODE = `
+self.onmessage = function(e) {
+  const { id, fn, params } = e.data;
+  let result;
+  const p = params;
+  const gauss = () => {
+    let u = 0, v = 0;
+    while(u === 0) u = Math.random();
+    while(v === 0) v = Math.random();
+    return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+  };
+  switch(fn) {
+    case 'power_electronics': // LAYER A
+      result = { V_dc: 1.35 * p.V_line, V_bus: p.V_line * 1.35 - (p.I_load || 0) * p.R_bus, D: p.V_input ? p.V_input / (p.V_line * 1.35 + 1e-6) : 0.5, P_sw: 0.5 * (p.V_line * 1.35) * (p.I_load || 0) * (p.t_r + p.t_f) * p.f_sw, E_gate: 0.5 * p.C_gate * p.V_gs * p.V_gs };
+      break;
+    case 'motor_electrical_adv': // LAYER B
+      result = { delta_I: ((p.V_bus || 600) - (p.K_e||0.1) * (p.omega || 0)) * p.D * (1/p.f_sw) / (p.L_motor||0.05), P_elec: (p.V_input || 0) * (p.I_load || 0), P_cu: (p.I_load || 0) * (p.I_load || 0) * (p.R_motor||0.1), P_fe: p.k_h * p.f_elec * p.B_field * p.B_field + p.k_e * p.f_elec * p.f_elec * p.B_field * p.B_field };
+      break;
+    case 'current_signature': // LAYER C
+      result = { I_env: (p.T_load||10) / ((p.K_t||0.1) * p.efficiency), f_mesh: p.N_teeth * ((p.omega||0) * 60 / (2 * Math.PI)) / 60, f_bpfo: (p.N_balls / 2) * (((p.omega||0) * 60 / (2 * Math.PI)) / 60) * (1 - (p.d_ball / p.D_pitch) * Math.cos(p.alpha_contact)), THD_i: 0.05 };
+      break;
+    case 'mechanical_drive': // LAYER D
+      result = { theta_twist: (p.T_net || 0) * p.L_shaft / (p.G_shear * p.J_polar), delta_belt: (p.F_belt || 0) * p.L_belt / (p.E_belt * p.A_belt), P_gear: (p.T_net || 0) * (p.omega || 0) * (1 - p.eta_gear), T_bearing: (p.mu_b||0.01) * p.F_radial * p.r_bearing, omega_crit: Math.sqrt(p.k_shaft / p.J_shaft) };
+      break;
+    case 'load_energy': // LAYER E
+      result = { E_tension: 0.5 * (p.T_tension || 0)**2 * p.L_span / (p.E_fabric * p.A_fabric), P_nip: (p.F_nip || 0) / (2 * (p.r_roller || 0.1) * (p.w_fabric || 1)), Q_fabric: p.k_fabric * p.A_heat * (p.dT_dx || 0), E_meniscus: Math.PI * p.r_nozzle**2 * p.gamma_ink, E_piezo: 0.5 * p.C_piezo * p.V_drive**2 };
+      break;
+
+    case 'sensor_temp':
+      result = p.T_true + gauss() * p.sigma_t;
+      break;
+    case 'sensor_rh':
+      result = p.RH_true + gauss() * p.sigma_rh;
+      break;
+    case 'sensor_dp':
+      result = p.DP_true + gauss() * p.sigma_dp;
+      break;
+    case 'dew_point': {
+      const a = 17.27 * p.T / (237.7 + p.T) + Math.log(p.RH / 100);
+      result = 237.7 * a / (17.27 - a);
+      break;
+    }
+    case 'delta_t':
+      result = Math.max(0, p.T_meas - p.T_max, p.T_min - p.T_meas);
+      break;
+    case 'delta_rh':
+      result = Math.max(0, p.RH_meas - p.RH_max, p.RH_min - p.RH_meas);
+      break;
+    case 'delta_dp':
+      result = Math.max(0, p.DP_meas - p.DP_limit);
+      break;
+    case 'hysteresis':
+      result = p.delta > p.hyst ? 1 : (p.delta < 0.1 ? 0 : p.state_prev);
+      break;
+    case 'alert_level':
+      result = p.w_t * p.dt_norm + p.w_rh * p.drh_norm + p.w_dp * p.ddp_norm;
+      break;
+    case 'compliance_decay':
+      result = p.compliance * Math.exp(-p.lambda * p.alert * p.dt) + (1 - p.alert_state) * p.growth;
+      break;
+    default:
+      result = NaN;
+  }
+  self.postMessage({ id, result });
+};
+`;
+
+const WORKER_POOL_SIZE = 4;
+const workerPool = [];
+const workerQueue = [];
+let workerIdCounter = 0;
+
+function createWorker() {
+  const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  const worker = new Worker(url);
+  worker.busy = false;
+  worker.pending = null;
+  URL.revokeObjectURL(url);
+  return worker;
+}
+
+function initWorkerPool() {
+  for (let i = 0; i < WORKER_POOL_SIZE; i++) {
+    const w = createWorker();
+    w.onmessage = function(e) {
+      w.busy = false;
+      if (w.pending) {
+        const { resolve } = w.pending;
+        w.pending = null;
+        resolve(e.data.result);
+      }
+      drainWorkerQueue(w);
+    };
+    workerPool.push(w);
+  }
+}
+
+function drainWorkerQueue(worker) {
+  if (workerQueue.length === 0) return;
+  const task = workerQueue.shift();
+  worker.busy = true;
+  worker.postMessage({ id: task.id, fn: task.fn, params: task.params });
+}
+
+function execFormula(fn, params) {
+  return new Promise(resolve => {
+    const idle = workerPool.find(w => !w.busy);
+    if (idle) {
+      idle.busy = true;
+      idle.onmessage = function(e) {
+        idle.busy = false;
+        resolve(e.data.result);
+        drainWorkerQueue(idle);
+      };
+      idle.postMessage({ id: workerIdCounter++, fn, params });
+    } else {
+      workerQueue.push({ id: workerIdCounter++, fn, params, resolve });
+    }
+  });
+}
+
+async function execParallel(formulas) {
+  return Promise.all(formulas.map(f => execFormula(f.fn, f.params)));
+}
+
+const PARAMS = {
+  // LAYER A-E Energy Chain Params
+  D_pwm: 0.5, V_bus_nom: 600, t_r: 1e-7, t_f: 1e-7, f_sw: 10000, C_gate: 1e-9, V_gs: 15, R_bus: 0.1, V_line: 400,
+  k_h: 0.01, k_e: 0.001, B_field: 1.5, f_elec: 50,
+  efficiency: 0.9, N_teeth: 50, N_balls: 8, d_ball: 0.01, D_pitch: 0.05, alpha_contact: 0, I_nominal: 10,
+  L_shaft: 1.0, G_shear: 79e9, J_polar: 1e-4, L_belt: 2.0, E_belt: 1e9, A_belt: 0.001, eta_gear: 0.98, F_radial: 500, r_bearing: 0.02, k_shaft: 1e6, J_shaft: 0.05,
+  L_span: 1.0, k_fabric: 0.5, A_heat: 1.0, gamma_ink: 0.03, r_nozzle: 1e-5, C_piezo: 1e-6, V_drive: 50,
+  t_min: 15, t_max: 30, rh_min: 40, rh_max: 70, dp_limit: 12,
+  noise_t: 0.2, noise_rh: 1, noise_dp: 0.3,
+  drift: 0.01, hyst: 2, sens: 0.8, w_t: 0.6,
+  T_true: 22, RH_true: 55, DP_true: 10,
+};
+
+const state = {
+  I_env: 0, delta_I: 0, fault_stall: false, fault_overcurrent: false,
+  T_meas: 22, RH_meas: 55, DP_meas: 10,
+  delta_t: 0, delta_rh: 0, delta_dp: 0,
+  alert_level: 0, compliance: 1, uptime: 1,
+  drift_T: 0, drift_RH: 0, alert_state: 0,
+  tickCount: 0, simTime: 0, running: false, speed: 1,
+};
+
+const DT = 0.01;
+
+const HIST_LEN = 300, SPARK_LEN = 50;
+const hist = { T_meas: [], RH_meas: [], DP_meas: [], alert_level: [] };
+  hist.I_signature = []; spark.I_signature = [];
+const spark = { T_meas:[], RH_meas:[], DP_meas:[], delta_t:[], delta_rh:[], delta_dp:[], alert_level:[], compliance:[], uptime:[] };
+
+function pushHist(arr, val) { arr.push(val); if (arr.length > HIST_LEN) arr.shift(); }
+function pushSpark(arr, val) { arr.push(val); if (arr.length > SPARK_LEN) arr.shift(); }
+
+const sliderMap = [
+  { id:'s_t_min', key:'t_min', fmt:v=>v.toFixed(1)+' °C', d:'v_t_min' },
+  { id:'s_t_max', key:'t_max', fmt:v=>v.toFixed(1)+' °C', d:'v_t_max' },
+  { id:'s_rh_min', key:'rh_min', fmt:v=>v.toFixed(0)+' %', d:'v_rh_min' },
+  { id:'s_rh_max', key:'rh_max', fmt:v=>v.toFixed(0)+' %', d:'v_rh_max' },
+  { id:'s_dp_limit', key:'dp_limit', fmt:v=>v.toFixed(1)+' °C', d:'v_dp_limit' },
+  { id:'s_noise_t', key:'noise_t', fmt:v=>v.toFixed(2)+' °C', d:'v_noise_t' },
+  { id:'s_noise_rh', key:'noise_rh', fmt:v=>v.toFixed(1)+' %', d:'v_noise_rh' },
+  { id:'s_drift', key:'drift', fmt:v=>v.toFixed(3)+' %/day', d:'v_drift' },
+  { id:'s_hyst', key:'hyst', fmt:v=>v.toFixed(1), d:'v_hyst' },
+  { id:'s_sens', key:'sens', fmt:v=>v.toFixed(2), d:'v_sens' },
+  { id:'s_w_t', key:'w_t', fmt:v=>v.toFixed(2)+' : '+(1-v).toFixed(2), d:'v_w_t' },
+];
+
+sliderMap.forEach(s => {
+  const el = document.getElementById(s.id);
+  const disp = document.getElementById(s.d);
+  el.value = PARAMS[s.key];
+  disp.textContent = s.fmt(PARAMS[s.key]);
+  el.addEventListener('input', () => { PARAMS[s.key] = parseFloat(el.value); disp.textContent = s.fmt(PARAMS[s.key]); });
+});
+
+async function tick() {
+  const p = PARAMS, s = state;
+
+  // Step 1: Sensor readings with noise (3 parallel)
+  const T_ambient = p.T_true + Math.sin(s.simTime * 0.3) * 3 + s.drift_T;
+  const RH_ambient = p.RH_true + Math.sin(s.simTime * 0.2) * 8 + s.drift_RH;
+  const [Tmeas, RHmeas] = await execParallel([
+    { fn: 'sensor_temp', params: { T_true: T_ambient, sigma_t: p.noise_t } },
+    { fn: 'sensor_rh', params: { RH_true: RH_ambient, sigma_rh: p.noise_rh } },
+  ]);
+  s.T_meas = Tmeas;
+  s.RH_meas = Math.max(5, Math.min(100, RHmeas));
+
+  // Step 2: Dew point calculation
+  const [dp_calc] = await execParallel([
+    { fn: 'dew_point', params: { T: s.T_meas, RH: s.RH_meas } }
+  ]);
+  s.DP_meas = dp_calc;
+
+  // Step 3: Envelope violation deltas (3 parallel)
+  const [dt_v, drh_v, ddp_v] = await execParallel([
+    { fn: 'delta_t', params: { T_meas: s.T_meas, T_max: p.t_max, T_min: p.t_min } },
+    { fn: 'delta_rh', params: { RH_meas: s.RH_meas, RH_max: p.rh_max, RH_min: p.rh_min } },
+    { fn: 'delta_dp', params: { DP_meas: s.DP_meas, DP_limit: p.dp_limit } }
+  ]);
+  s.delta_t = dt_v;
+  s.delta_rh = drh_v;
+  s.delta_dp = ddp_v;
+
+  // Step 4: Hysteresis filter
+  const totalDelta = s.delta_t + s.delta_rh + s.delta_dp;
+  const [hyst_state] = await execParallel([
+    { fn: 'hysteresis', params: { delta: totalDelta, hyst: p.hyst, state_prev: s.alert_state } }
+  ]);
+  s.alert_state = hyst_state;
+
+  // Step 5: Weighted severity score
+  const [alert] = await execParallel([
+    { fn: 'alert_level', params: { w_t: p.w_t, w_rh: 1 - p.w_t, w_dp: 0.2, dt_norm: s.delta_t / 15, drh_norm: s.delta_rh / 30, ddp_norm: s.delta_dp / 10 } }
+  ]);
+  s.alert_level = Math.min(1, alert * p.sens);
+
+  // Step 6: Sensor drift accumulation
+  s.drift_T += p.drift * DT * 0.01;
+  s.drift_RH += p.drift * DT * 0.02;
+
+  // Step 7: Compliance decay
+  const [comp] = await execParallel([
+    { fn: 'compliance_decay', params: { compliance: s.compliance, lambda: 2.0, alert: s.alert_level, dt: DT, alert_state: s.alert_state, growth: 0.005 } }
+  ]);
+  s.compliance = Math.max(0, Math.min(1, comp));
+
+  // Step 8: Uptime
+  s.uptime = 1 - Math.pow(1 - s.compliance, Math.max(1, s.simTime * 0.1));
+
+  
+  // ── LAYER A-E: Energy Chain (Parallel) ──
+  if (typeof execParallel === 'function') {
+    const [resA, resB, resC, resD, resE] = await execParallel([
+      { fn: 'power_electronics', params: { V_line: p.V_line, I_load: s.I_motor || s.I_load || 0, R_bus: p.R_bus, V_input: s.V_input || 0, t_r: p.t_r, t_f: p.t_f, f_sw: p.f_sw, C_gate: p.C_gate, V_gs: p.V_gs } },
+      { fn: 'motor_electrical_adv', params: { K_e: p.K_e, omega: s.omega || 0, V_bus: 600, D: 0.5, f_sw: p.f_sw, L_motor: p.L_motor, V_input: s.V_input || 0, I_load: s.I_motor || s.I_load || 0, R_motor: p.R_motor, k_h: p.k_h, f_elec: p.f_elec, B_field: p.B_field, k_e: p.k_e } },
+      { fn: 'current_signature', params: { omega: s.omega || 0, T_load: s.T_load || p.T_load, K_t: p.K_t, efficiency: p.efficiency, N_teeth: p.N_teeth, N_balls: p.N_balls, d_ball: p.d_ball, D_pitch: p.D_pitch, alpha_contact: p.alpha_contact } },
+      { fn: 'mechanical_drive', params: { T_net: s.T_net || 0, L_shaft: p.L_shaft, G_shear: p.G_shear, J_polar: p.J_polar, F_belt: s.F_belt || 0, L_belt: p.L_belt, E_belt: p.E_belt, A_belt: p.A_belt, omega: s.omega || 0, eta_gear: p.eta_gear, mu_b: p.mu_b || 0.01, F_radial: p.F_radial, r_bearing: p.r_bearing, k_shaft: p.k_shaft, J_shaft: p.J_shaft } },
+      { fn: 'load_energy', params: { T_tension: s.T_tension || 0, L_span: p.L_span, E_fabric: p.E_fabric || 1e9, A_fabric: p.A_fabric || 0.001, F_nip: s.F_nip || 0, r_roller: p.r_roller || 0.1, w_fabric: p.w_fabric || 1, k_fabric: p.k_fabric, A_heat: p.A_heat, dT_dx: s.dT_dx || 0, r_nozzle: p.r_nozzle, gamma_ink: p.gamma_ink, C_piezo: p.C_piezo, V_drive: p.V_drive } }
+    ]);
+    s.I_env = resC.I_env;
+    s.delta_I = resB.delta_I;
+  }
+  if (s.fault_stall) s.I_env *= 2.5;
+  if (s.fault_overcurrent) s.I_env *= 1.5;
+  
+  if (typeof hist !== 'undefined' && hist.I_signature) {
+     hist.I_signature.push(s.I_env || 0); if (hist.I_signature.length > 300) hist.I_signature.shift();
+     if (typeof spark !== 'undefined' && spark.I_signature) { spark.I_signature.push(s.I_env || 0); if (spark.I_signature.length > 50) spark.I_signature.shift(); }
+  }
+
+  s.tickCount++;
+  s.simTime += DT;
+
+  pushHist(hist.T_meas, s.T_meas);
+  pushHist(hist.RH_meas, s.RH_meas);
+  pushHist(hist.DP_meas, s.DP_meas);
+  pushHist(hist.alert_level, s.alert_level);
+  pushSpark(spark.T_meas, s.T_meas);
+  pushSpark(spark.RH_meas, s.RH_meas);
+  pushSpark(spark.DP_meas, s.DP_meas);
+  pushSpark(spark.delta_t, s.delta_t);
+  pushSpark(spark.delta_rh, s.delta_rh);
+  pushSpark(spark.delta_dp, s.delta_dp);
+  pushSpark(spark.alert_level, s.alert_level);
+  pushSpark(spark.compliance, s.compliance);
+  pushSpark(spark.uptime, s.uptime);
+}
+
+function drawChart(canvasId, data, color, refLine, refColor) {
+  const canvas = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 6, right: 10, bottom: 20, left: 48 };
+  const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+
+  let dMin = Infinity, dMax = -Infinity;
+  for (const v of data) { if (v < dMin) dMin = v; if (v > dMax) dMax = v; }
+  if (!isFinite(dMin)) { dMin = 0; dMax = 1; }
+  if (dMin === dMax) { dMin -= 1; dMax += 1; }
+  const range = dMax - dMin;
+  dMin -= range * 0.1; dMax += range * 0.1;
+
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.08)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (i / 4) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    const val = dMax - (i / 4) * (dMax - dMin);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#6b7280';
+    ctx.font = '9px SF Mono, Menlo, monospace'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(val >= 100 ? 0 : val >= 1 ? 1 : 2), pad.left - 4, y + 3);
+  }
+
+  if (refLine !== undefined) {
+    const ry = pad.top + (1 - (refLine - dMin) / (dMax - dMin)) * ch;
+    ctx.strokeStyle = refColor || '#D85A30'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, ry); ctx.lineTo(pad.left + cw, ry); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (data.length < 2) return;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = pad.left + (i / (HIST_LEN - 1)) * cw;
+    const y = pad.top + (1 - (data[i] - dMin) / (dMax - dMin)) * ch;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function sparkSVG(data, color, w, h) {
+  if (data.length < 2) return '';
+  let lo = Infinity, hi = -Infinity;
+  for (const v of data) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const range = hi - lo || 1;
+  const pts = data.map((v, i) => `${(i/(data.length-1)*w).toFixed(1)},${(h-((v-lo)/range)*(h-2)-1).toFixed(1)}`);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+}
+
+const stateVars = [
+  { key:'T_meas', sym:'T_meas', name:'Temperature', unit:'°C', color:'#378ADD', warn:28, crit:30 },
+  { key:'RH_meas', sym:'RH', name:'Relative Humidity', unit:'%', color:'#1D9E75', warn:65, crit:70 },
+  { key:'DP_meas', sym:'DP', name:'Dew Point', unit:'°C', color:'#BA7517', warn:10, crit:12 },
+  { key:'delta_t', sym:'ΔT', name:'Temp Violation', unit:'°C', color:'#D85A30', warn:2, crit:5 },
+  { key:'delta_rh', sym:'ΔRH', name:'RH Violation', unit:'%', color:'#D85A30', warn:5, crit:10 },
+  { key:'delta_dp', sym:'ΔDP', name:'DP Violation', unit:'°C', color:'#D85A30', warn:1, crit:3 },
+  { key:'alert_level', sym:'A_lvl', name:'Alert Level', unit:'', color:'#D85A30', warn:0.3, crit:0.7 },
+  { key:'compliance', sym:'C(t)', name:'Compliance', unit:'', color:'#1D9E75', warn:null, crit:null },
+  { key:'uptime', sym:'U(t)', name:'Uptime Factor', unit:'', color:'#378ADD', warn:null, crit:null },
+];
+
+function buildStateCards() {
+  document.getElementById('stateGrid').innerHTML = stateVars.map(sv =>
+    `<div class="state-card ok" id="sc_${sv.key}">
+      <div class="sc-left">
+        <div class="sc-sym">${sv.sym}</div>
+        <div class="sc-name">${sv.name}</div>
+        <div class="sc-val" id="scv_${sv.key}">—<span class="sc-unit">${sv.unit}</span></div>
+      </div>
+      <div class="sc-sparkline" id="sp_${sv.key}"></div>
+    </div>`
+  ).join('');
+}
+
+function updateStateCards() {
+  stateVars.forEach(sv => {
+    const val = state[sv.key];
+    const card = document.getElementById(`sc_${sv.key}`);
+    let status = 'ok';
+    if (sv.crit !== null && val > sv.crit) status = 'crit';
+    else if (sv.warn !== null && val > sv.warn) status = 'warn';
+    card.className = `state-card ${status}`;
+    document.getElementById(`scv_${sv.key}`).innerHTML = `${sigFig(val,4)}<span class="sc-unit">${sv.unit}</span>`;
+    document.getElementById(`sp_${sv.key}`).innerHTML = sparkSVG(spark[sv.key], sv.color, 64, 32);
+  });
+}
+
+function sigFig(n, sf) {
+  if (!Number.isFinite(n)) return '—';
+  if (n === 0) return '0';
+  return n.toFixed(Math.max(0, sf - 1 - Math.floor(Math.log10(Math.abs(n)))));
+}
+
+function updateSchematic() {
+  const s = state, p = PARAMS;
+
+  // Update gauge text values
+  document.getElementById('sch_t_val').textContent = s.T_meas.toFixed(1) + '°C';
+  document.getElementById('sch_rh_val').textContent = s.RH_meas.toFixed(0) + '%';
+  document.getElementById('sch_dp_val').textContent = s.DP_meas.toFixed(1) + '°C';
+
+  // Animate needles — angle from -90 to +90 degrees
+  const t_angle = ((s.T_meas - 10) / 35) * 180 - 90;
+  document.getElementById('temp_needle').setAttribute('transform', `rotate(${t_angle.toFixed(1)} 150 120)`);
+
+  const rh_angle = ((s.RH_meas - 20) / 80) * 180 - 90;
+  document.getElementById('rh_needle').setAttribute('transform', `rotate(${rh_angle.toFixed(1)} 300 120)`);
+
+  const dp_angle = ((s.DP_meas - 0) / 25) * 180 - 90;
+  document.getElementById('dp_needle').setAttribute('transform', `rotate(${dp_angle.toFixed(1)} 450 120)`);
+
+  // Arc dashoffsets (lower offset = more arc filled)
+  const tFrac = Math.min(1, (s.T_meas - 10) / 35);
+  document.getElementById('temp_arc').setAttribute('stroke-dashoffset', (157 * (1 - tFrac)).toFixed(1));
+
+  const rhFrac = Math.min(1, s.RH_meas / 100);
+  document.getElementById('rh_arc').setAttribute('stroke-dashoffset', (157 * (1 - rhFrac)).toFixed(1));
+
+  const dpFrac = Math.min(1, s.DP_meas / 25);
+  document.getElementById('dp_arc').setAttribute('stroke-dashoffset', (157 * (1 - dpFrac)).toFixed(1));
+
+  // Alert lights
+  document.getElementById('alert_t').style.fill = s.delta_t > 5 ? 'var(--red)' : s.delta_t > 1 ? 'var(--amber)' : 'var(--green)';
+  document.getElementById('alert_rh').style.fill = s.delta_rh > 10 ? 'var(--red)' : s.delta_rh > 3 ? 'var(--amber)' : 'var(--green)';
+  document.getElementById('alert_dp').style.fill = s.delta_dp > 3 ? 'var(--red)' : s.delta_dp > 0.5 ? 'var(--amber)' : 'var(--green)';
+
+  document.getElementById('sch_comp_val').textContent = 'Compliance: ' + (s.compliance * 100).toFixed(1) + '%';
+}
+
+function formatTime(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateTopBar() {
+  document.getElementById('simTime').textContent = formatTime(state.simTime);
+  const pct = state.compliance * 100;
+  document.getElementById('compProgress').style.width = pct.toFixed(1) + '%';
+  document.getElementById('compProgress').style.background = pct > 90 ? 'var(--green)' : pct > 70 ? 'var(--amber)' : 'var(--red)';
+  document.getElementById('compPct').textContent = pct.toFixed(1) + '%';
+}
+
+function updateChartValues() {
+  document.getElementById('ct_Tamb').textContent = state.T_meas.toFixed(1) + ' °C';
+  document.getElementById('ct_RH').textContent = state.RH_meas.toFixed(1) + ' %';
+  document.getElementById('ct_dew').textContent = state.DP_meas.toFixed(1) + ' °C';
+  document.getElementById('ct_alert').textContent = (state.alert_level * 100).toFixed(1) + '%';
+}
+
+const btnPlay = document.getElementById('btnPlay');
+btnPlay.addEventListener('click', () => {
+  state.running = !state.running;
+  btnPlay.textContent = state.running ? '⏸ Pause' : '▶ Play';
+  btnPlay.classList.toggle('primary', !state.running);
+  btnPlay.classList.toggle('danger', state.running);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.running = false;
+  btnPlay.textContent = '▶ Play'; btnPlay.classList.add('primary'); btnPlay.classList.remove('danger');
+  state.T_meas = 22; state.RH_meas = 55; state.DP_meas = 10;
+  state.delta_t = 0; state.delta_rh = 0; state.delta_dp = 0;
+  state.alert_level = 0; state.compliance = 1; state.uptime = 1;
+  state.drift_T = 0; state.drift_RH = 0; state.alert_state = 0;
+  state.tickCount = 0; state.simTime = 0;
+  hist.T_meas=[]; hist.RH_meas=[]; hist.DP_meas=[]; hist.alert_level=[];
+  Object.keys(spark).forEach(k => spark[k]=[]);
+});
+
+document.querySelectorAll('.speed-group .btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-group .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); state.speed = parseInt(btn.dataset.speed);
+  });
+});
+
+document.getElementById('formulaToggle').addEventListener('click', () => {
+  const body = document.getElementById('formulaBody');
+  const arrow = document.getElementById('formulaArrow');
+  const open = body.classList.toggle('open');
+  arrow.classList.toggle('open', open);
+});
+
+function render() {
+
+  const sigCanvas = document.getElementById('chart_signature');
+  if (sigCanvas && typeof drawChart === 'function' && hist.I_signature) {
+     drawChart('chart_signature', hist.I_signature, '#BA7517');
+     const ct_I_sig = document.getElementById('ct_I_sig');
+     if (ct_I_sig) ct_I_sig.textContent = (state.I_env || 0).toFixed(2) + ' A';
+  }
+
+  drawChart('chart_temp', hist.T_meas, '#378ADD', PARAMS.t_max, '#D85A30');
+  drawChart('chart_rh', hist.RH_meas, '#1D9E75', PARAMS.rh_max, '#BA7517');
+  drawChart('chart_dew', hist.DP_meas, '#BA7517', PARAMS.dp_limit, '#D85A30');
+  drawChart('chart_alert', hist.alert_level, '#D85A30', 0.5, '#BA7517');
+  updateSchematic(); updateStateCards(); updateTopBar(); updateChartValues();
+}
+
+async function loop() {
+  if (state.running) {
+    for (let i = 0; i < state.speed; i++) {
+      await tick();
+    }
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+initWorkerPool();
+buildStateCards();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

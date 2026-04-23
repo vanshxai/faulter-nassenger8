@@ -1,0 +1,2633 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Faulter Webapp</title>
+  <style>
+    :root {
+      --bg: #f3efe4;
+      --panel: rgba(255, 252, 245, 0.85);
+      --panel-strong: rgba(255, 255, 255, 0.78);
+      --ink: #14213d;
+      --muted: #5f6b7a;
+      --accent: #d97706;
+      --accent-soft: rgba(217, 119, 6, 0.14);
+      --secondary: #127c56;
+      --secondary-soft: rgba(18, 124, 86, 0.12);
+      --good: #127c56;
+      --bad: #b42318;
+      --grid: rgba(20, 33, 61, 0.08);
+      --shadow: 0 18px 60px rgba(20, 33, 61, 0.14);
+      --radius: 24px;
+    }
+
+    body.theme-dark {
+      --bg: #0e131c;
+      --panel: rgba(17, 24, 39, 0.9);
+      --panel-strong: rgba(30, 41, 59, 0.86);
+      --ink: #e5edf7;
+      --muted: #94a3b8;
+      --accent: #f59e0b;
+      --accent-soft: rgba(245, 158, 11, 0.16);
+      --secondary: #34d399;
+      --secondary-soft: rgba(52, 211, 153, 0.14);
+      --good: #34d399;
+      --bad: #f87171;
+      --grid: rgba(148, 163, 184, 0.12);
+      --shadow: 0 18px 60px rgba(2, 6, 23, 0.45);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(217, 119, 6, 0.2), transparent 30%),
+        radial-gradient(circle at top right, rgba(18, 124, 86, 0.18), transparent 25%),
+        linear-gradient(135deg, #efe6d0 0%, var(--bg) 55%, #e4edf2 100%);
+    }
+
+    body.theme-dark {
+      background:
+        radial-gradient(circle at top left, rgba(245, 158, 11, 0.16), transparent 24%),
+        radial-gradient(circle at top right, rgba(52, 211, 153, 0.12), transparent 20%),
+        linear-gradient(145deg, #111827 0%, #0f172a 55%, #111827 100%);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    .app-shell {
+      width: min(1380px, calc(100% - 32px));
+      margin: 24px auto 40px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .sidebar {
+      position: sticky;
+      top: 24px;
+      display: grid;
+      gap: 14px;
+      align-self: start;
+      overflow: hidden;
+      transition: padding 180ms ease, width 180ms ease, border-color 180ms ease;
+    }
+
+    .workspace.sidebar-collapsed {
+      grid-template-columns: 84px minmax(0, 1fr);
+    }
+
+    .workspace.sidebar-collapsed .sidebar {
+      padding-left: 12px;
+      padding-right: 12px;
+    }
+
+    .workspace.sidebar-collapsed .sidebar-nav {
+      justify-items: center;
+    }
+
+    .workspace.sidebar-collapsed .tab-button {
+      width: 100%;
+      justify-content: center;
+      padding-left: 0;
+      padding-right: 0;
+      min-height: 48px;
+    }
+
+    .workspace.sidebar-collapsed .nav-icon,
+    .workspace.sidebar-collapsed .action-icon {
+      margin: 0;
+    }
+
+    .workspace.sidebar-collapsed .sidebar-brand {
+      justify-content: center;
+    }
+
+    .sidebar-nav {
+      display: grid;
+      gap: 10px;
+    }
+
+    .sidebar-actions {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .sidebar-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .sidebar-brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--accent), #ffcf67);
+      color: #1b1304;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.4);
+    }
+
+    .brand-text strong {
+      display: block;
+      font-size: 15px;
+      line-height: 1.1;
+    }
+
+    .workspace.sidebar-collapsed .brand-text {
+      display: none;
+    }
+
+    .content-stack {
+      display: grid;
+      gap: 18px;
+    }
+
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+    }
+
+    .hero {
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 18px;
+      flex-wrap: wrap;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      font-size: 11px;
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    h1, h2, h3, p {
+      margin: 0;
+    }
+
+    .hero h1 {
+      font-size: clamp(30px, 5vw, 52px);
+      line-height: 0.95;
+      margin-top: 8px;
+    }
+
+    .hero-copy {
+      max-width: 760px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .hero-copy p {
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 15px;
+    }
+
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      width: 100%;
+    }
+
+    .stat {
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.62);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      padding: 14px 16px;
+    }
+
+    .stat strong {
+      display: block;
+      font-size: 26px;
+      line-height: 1;
+    }
+
+    .stat span {
+      display: block;
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tabbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .tab-button,
+    .chip,
+    .category-button,
+    .worker-chip,
+    button {
+      appearance: none;
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      cursor: pointer;
+      transition: transform 120ms ease, opacity 120ms ease, background 160ms ease, border-color 160ms ease;
+    }
+
+    .tab-button:hover,
+    .chip:hover,
+    .category-button:hover,
+    .worker-chip:hover,
+    button:hover {
+      transform: translateY(-1px);
+    }
+
+    .tab-button {
+      background: rgba(20, 33, 61, 0.07);
+      color: var(--ink);
+      font-weight: 700;
+      text-align: left;
+      border: 1px solid transparent;
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      min-height: 48px;
+    }
+
+    .tab-button.active {
+      background: var(--ink);
+      color: #fff;
+    }
+
+    .icon-button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      background: rgba(20, 33, 61, 0.07);
+      color: var(--ink);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      font-weight: 700;
+      min-height: 46px;
+      padding-left: 0;
+      padding-right: 0;
+    }
+
+    .nav-icon,
+    .action-icon {
+      width: 18px;
+      text-align: center;
+      flex: 0 0 18px;
+      opacity: 0.9;
+    }
+
+    .nav-label,
+    .action-label {
+      display: none;
+    }
+
+    .app-section {
+      display: none;
+      gap: 18px;
+    }
+
+    .app-section.active {
+      display: grid;
+    }
+
+    .section-hero {
+      display: grid;
+      gap: 10px;
+    }
+
+    .section-hero p {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      padding: 10px 14px;
+      border-radius: 999px;
+      width: fit-content;
+      background: rgba(20, 33, 61, 0.06);
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--bad);
+      box-shadow: 0 0 0 6px rgba(180, 35, 24, 0.12);
+    }
+
+    .connected .dot {
+      background: var(--good);
+      box-shadow: 0 0 0 6px rgba(18, 124, 86, 0.14);
+    }
+
+    .actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    button.primary {
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+    }
+
+    button.secondary {
+      background: rgba(20, 33, 61, 0.08);
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    input, select {
+      width: 100%;
+      border: 1px solid rgba(20, 33, 61, 0.15);
+      border-radius: 14px;
+      padding: 12px 14px;
+      background: rgba(255, 255, 255, 0.7);
+      color: var(--ink);
+    }
+
+    .setup {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(180px, 260px) auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .ports {
+      display: grid;
+      grid-template-columns: minmax(260px, 1fr) auto auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field label,
+    .subtle {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .mini {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px 16px;
+      font-family: "SFMono-Regular", "Menlo", monospace;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .flashline {
+      font-family: "SFMono-Regular", "Menlo", monospace;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .checkline {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .checkline input {
+      width: auto;
+      margin: 0;
+    }
+
+    .log {
+      background: #101826;
+      color: #dbe7ff;
+      min-height: 420px;
+      max-height: 60vh;
+      overflow: auto;
+      padding: 18px;
+      border-radius: 18px;
+      font-family: "SFMono-Regular", "Menlo", monospace;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .log-line {
+      padding: 3px 0;
+      border-bottom: 1px solid rgba(219, 231, 255, 0.05);
+    }
+
+    .proof { color: #7ef0b4; }
+    .warn { color: #ffd08a; }
+    .err { color: #ff8d8d; }
+
+    .formula-shell {
+      display: grid;
+      grid-template-columns: 280px minmax(320px, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .formula-shell > * {
+      min-width: 0;
+    }
+
+    .formula-sidebar,
+    .formula-library {
+      min-height: 760px;
+    }
+
+    .formula-sidebar,
+    .formula-library,
+    .card,
+    .worker-card,
+    .flow-card,
+    .summary-card {
+      background: rgba(255, 252, 245, 0.76);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      border-radius: 22px;
+      box-shadow: var(--shadow);
+    }
+
+    .formula-sidebar,
+    .formula-library {
+      padding: 18px;
+      min-width: 0;
+    }
+
+    .formula-sidebar {
+      position: sticky;
+      top: 20px;
+      display: grid;
+      gap: 16px;
+      align-self: start;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .section-label {
+      font-size: 12px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+    }
+
+    .category-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .category-button {
+      width: 100%;
+      text-align: left;
+      background: rgba(255, 255, 255, 0.72);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      color: var(--ink);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-weight: 700;
+    }
+
+    .category-button.active {
+      background: var(--accent-soft);
+      border-color: rgba(217, 119, 6, 0.36);
+      color: #7b3f00;
+    }
+
+    .formula-library {
+      display: grid;
+      gap: 14px;
+    }
+
+    .formula-toolbar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      position: sticky;
+      top: 0;
+      padding-bottom: 10px;
+      background: linear-gradient(180deg, rgba(243, 239, 228, 0.96), rgba(243, 239, 228, 0.7));
+      z-index: 3;
+      backdrop-filter: blur(10px);
+    }
+
+    .formula-toolbar input {
+      flex: 1 1 320px;
+    }
+
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      padding: 16px;
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      min-height: 220px;
+    }
+
+    .card:hover,
+    .card.active {
+      transform: translateY(-2px);
+      border-color: rgba(217, 119, 6, 0.34);
+    }
+
+    body.theme-dark .card,
+    body.theme-dark .worker-card,
+    body.theme-dark .flow-card,
+    body.theme-dark .summary-card,
+    body.theme-dark .detail,
+    body.theme-dark .var-row,
+    body.theme-dark .formula-sidebar,
+    body.theme-dark .formula-library,
+    body.theme-dark .inspector-window {
+      border-color: rgba(148, 163, 184, 0.16);
+      background: rgba(15, 23, 42, 0.66);
+    }
+
+    body.theme-dark input,
+    body.theme-dark select {
+      background: rgba(15, 23, 42, 0.8);
+      color: var(--ink);
+      border-color: rgba(148, 163, 184, 0.2);
+    }
+
+    body.theme-dark .tab-button {
+      background: rgba(148, 163, 184, 0.12);
+      color: var(--ink);
+    }
+
+    body.theme-dark .tab-button.active {
+      background: var(--accent);
+      color: #111827;
+    }
+
+    body.theme-dark .tag,
+    body.theme-dark .worker-chip,
+    body.theme-dark .chain-node {
+      background: rgba(30, 41, 59, 0.88);
+      color: var(--muted);
+      border-color: rgba(148, 163, 184, 0.18);
+    }
+
+    body.theme-dark .formula-text,
+    body.theme-dark .hero-formula {
+      color: #d9ecff;
+    }
+
+    body.theme-dark .inspect-button,
+    body.theme-dark .close-button {
+      background: rgba(148, 163, 184, 0.12);
+      color: var(--ink);
+      border-color: rgba(148, 163, 184, 0.16);
+    }
+
+    body.theme-dark .inspector-modal {
+      background: rgba(2, 6, 23, 0.58);
+    }
+
+
+    .card-top,
+    .worker-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: flex-start;
+    }
+
+    .chip {
+      background: var(--accent-soft);
+      color: #8a4800;
+      border: 1px solid rgba(217, 119, 6, 0.28);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 6px 10px;
+    }
+
+    .tag-row,
+    .worker-tags,
+    .worker-chain {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .tag,
+    .worker-chip {
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      border: 1px solid rgba(20, 33, 61, 0.1);
+      background: rgba(255, 255, 255, 0.8);
+      color: var(--muted);
+    }
+
+    .formula-text {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1d3850;
+      line-height: 1.25;
+    }
+
+    .description {
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .hero-formula {
+      margin-top: 12px;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.25;
+      color: #16344d;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .detail,
+    .var-row,
+    .summary-card,
+    .flow-card,
+    .worker-card {
+      padding: 14px;
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.7);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+    }
+
+    .var-row {
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: end;
+    }
+
+    .detail label {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+    }
+
+    .variables {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .var-copy {
+      min-width: 0;
+    }
+
+    .var-row strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 15px;
+      min-width: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .var-meta {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 0;
+      overflow-wrap: anywhere;
+    }
+
+    .result-box {
+      margin-top: 18px;
+      padding: 16px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, rgba(20, 33, 61, 0.96), rgba(31, 77, 112, 0.96));
+      color: #fbf7f0;
+    }
+
+    .result-box label {
+      display: block;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      opacity: 0.7;
+      margin-bottom: 10px;
+    }
+
+    .result-value {
+      font-size: 30px;
+      font-weight: 800;
+      line-height: 1.2;
+    }
+
+    .result-help {
+      margin-top: 8px;
+      font-size: 13px;
+      color: rgba(251, 247, 240, 0.76);
+    }
+
+    .json-preview {
+      margin-top: 18px;
+      padding: 14px;
+      border-radius: 18px;
+      background: #101826;
+      color: #dbe7ff;
+      overflow: auto;
+      max-width: 100%;
+      font-size: 12px;
+      line-height: 1.5;
+      max-height: 260px;
+    }
+
+    .var-input {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      min-width: 0;
+    }
+
+    .var-row input {
+      display: block;
+      width: 112px;
+      max-width: 112px;
+      min-width: 112px;
+      text-align: right;
+    }
+
+    .empty-state {
+      padding: 32px 20px;
+      border: 1px dashed rgba(20, 33, 61, 0.16);
+      border-radius: 22px;
+      color: var(--muted);
+      text-align: center;
+      background: rgba(255, 255, 255, 0.6);
+    }
+
+    .inspect-button {
+      margin-top: auto;
+      width: fit-content;
+      background: rgba(20, 33, 61, 0.08);
+      color: var(--ink);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      font-weight: 700;
+      padding: 10px 14px;
+      border-radius: 999px;
+    }
+
+    .inspector-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.38);
+      backdrop-filter: blur(10px);
+      z-index: 40;
+    }
+
+    .inspector-modal.open {
+      display: flex;
+    }
+
+    .inspector-window {
+      width: min(760px, 100%);
+      max-height: min(88vh, 920px);
+      overflow: auto;
+      background: rgba(255, 252, 245, 0.95);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      border-radius: 26px;
+      box-shadow: 0 24px 70px rgba(20, 33, 61, 0.22);
+      padding: 20px;
+    }
+
+    .inspector-window-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 14px;
+    }
+
+    .close-button {
+      flex: 0 0 auto;
+      background: rgba(20, 33, 61, 0.08);
+      color: var(--ink);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      font-weight: 700;
+      min-height: 42px;
+      padding: 10px 14px;
+      border-radius: 999px;
+    }
+
+    .nassenger-shell {
+      display: grid;
+      gap: 18px;
+    }
+
+    .nassenger-tools {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .twin-button {
+      background: linear-gradient(135deg, var(--accent), #ffbf57);
+      color: #1b1304;
+      border: 1px solid rgba(217, 119, 6, 0.24);
+      font-weight: 800;
+      padding: 11px 16px;
+      border-radius: 999px;
+    }
+
+    .twin-hint {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .flow-card {
+      display: grid;
+      gap: 14px;
+    }
+
+    .flow-river {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .flow-node {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 16px;
+      border-radius: 999px;
+      background: rgba(18, 124, 86, 0.1);
+      color: #0f6a49;
+      font-weight: 800;
+      border: 1px solid rgba(18, 124, 86, 0.2);
+    }
+
+    .flow-arrow {
+      color: var(--muted);
+      font-weight: 800;
+      font-size: 20px;
+    }
+
+    .workers-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+    }
+
+    .worker-card {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+      cursor: pointer;
+      transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    .worker-card:hover,
+    .worker-card.active {
+      transform: translateY(-2px);
+      border-color: rgba(217, 119, 6, 0.34);
+      box-shadow: 0 18px 40px rgba(20, 33, 61, 0.12);
+    }
+
+    .worker-title {
+      display: grid;
+      gap: 6px;
+    }
+
+    .worker-title h3 {
+      font-size: 20px;
+      line-height: 1.15;
+    }
+
+    .worker-sub {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .worker-chain {
+      align-items: center;
+    }
+
+    .chain-node {
+      padding: 8px 10px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .chain-arrow {
+      color: var(--muted);
+      font-weight: 800;
+    }
+
+    .worker-chip {
+      cursor: default;
+      padding: 7px 11px;
+    }
+
+    .worker-status {
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .twin-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.46);
+      backdrop-filter: blur(10px);
+      z-index: 45;
+    }
+
+    .twin-modal.open {
+      display: flex;
+    }
+
+    .twin-window {
+      width: min(1380px, 100%);
+      max-height: min(90vh, 980px);
+      overflow: auto;
+      background: rgba(255, 252, 245, 0.96);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      border-radius: 28px;
+      box-shadow: 0 28px 80px rgba(20, 33, 61, 0.24);
+      padding: 20px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .twin-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .twin-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.9fr) 360px;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .twin-stage {
+      position: relative;
+      min-height: 860px;
+      border-radius: 24px;
+      padding: 22px;
+      background:
+        radial-gradient(circle at top left, rgba(217, 119, 6, 0.12), transparent 24%),
+        linear-gradient(180deg, rgba(255,255,255,0.8), rgba(245, 239, 228, 0.85));
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      overflow: hidden;
+    }
+
+    .twin-river {
+      position: absolute;
+      left: 7%;
+      right: 7%;
+      top: 49%;
+      height: 82px;
+      transform: translateY(-50%);
+      border-radius: 999px;
+      background:
+        linear-gradient(90deg, rgba(72, 147, 220, 0.26), rgba(72, 147, 220, 0.08)),
+        linear-gradient(90deg, rgba(68, 130, 196, 0.92), rgba(97, 170, 241, 0.7), rgba(68, 130, 196, 0.92));
+      box-shadow: inset 0 0 0 1px rgba(20, 33, 61, 0.1);
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    .twin-river::before,
+    .twin-river::after {
+      content: "";
+      position: absolute;
+      inset: 14px;
+      border-radius: 999px;
+      background:
+        repeating-linear-gradient(90deg,
+          rgba(255,255,255,0.2) 0 20px,
+          rgba(255,255,255,0.05) 20px 48px);
+      animation: riverFlow 2.8s linear infinite;
+      opacity: 0.65;
+    }
+
+    .twin-river::after {
+      inset: 30px 22px;
+      animation-duration: 3.8s;
+      opacity: 0.4;
+    }
+
+    @keyframes riverFlow {
+      from { transform: translateX(0); }
+      to { transform: translateX(68px); }
+    }
+
+    .twin-river-label {
+      position: absolute;
+      left: 50%;
+      top: 49%;
+      transform: translate(-50%, -50%);
+      z-index: 2;
+      padding: 8px 16px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.86);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      color: var(--muted);
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      font-size: 12px;
+    }
+
+    .twin-zone {
+      position: absolute;
+      top: 10%;
+      bottom: 10%;
+      border-radius: 22px;
+      border: 2px solid rgba(20, 33, 61, 0.14);
+      background: rgba(255,255,255,0.28);
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .zone-label {
+      position: absolute;
+      bottom: 18px;
+      left: 18px;
+      font-size: 12px;
+      font-weight: 900;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .twin-worker-label {
+      position: absolute;
+      z-index: 3;
+      transform: translateX(-50%);
+      font-size: 11px;
+      font-weight: 900;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .twin-link {
+      position: absolute;
+      width: 4px;
+      border-radius: 999px;
+      background: rgba(20, 33, 61, 0.2);
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+
+    .twin-link.h {
+      height: 4px;
+      width: var(--link-width, 40px);
+      transform: none;
+    }
+
+    .twin-chain-touch {
+      position: absolute;
+      z-index: 2;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.92);
+      border: 2px solid rgba(20, 33, 61, 0.14);
+      transform: translate(-50%, -50%);
+    }
+
+    .twin-node {
+      position: absolute;
+      z-index: 3;
+      display: grid;
+      gap: 3px;
+      min-width: 138px;
+      padding: 9px 12px 10px;
+      border-radius: 24px;
+      border: 1px solid rgba(20, 33, 61, 0.1);
+      background: rgba(255, 255, 255, 0.94);
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+      box-shadow: 0 12px 24px rgba(20, 33, 61, 0.1);
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .twin-node.domain-electrical {
+      border-color: rgba(245, 158, 11, 0.35);
+      box-shadow: 0 12px 24px rgba(245, 158, 11, 0.14);
+    }
+
+    .twin-node.domain-mechanical {
+      border-color: rgba(59, 130, 246, 0.28);
+      box-shadow: 0 12px 24px rgba(59, 130, 246, 0.14);
+    }
+
+    .twin-node.domain-thermal {
+      border-color: rgba(239, 68, 68, 0.3);
+      box-shadow: 0 12px 24px rgba(239, 68, 68, 0.14);
+    }
+
+    .twin-node.domain-fluid {
+      border-color: rgba(13, 148, 136, 0.3);
+      box-shadow: 0 12px 24px rgba(13, 148, 136, 0.14);
+    }
+
+    .twin-node.domain-control {
+      border-color: rgba(147, 51, 234, 0.28);
+      box-shadow: 0 12px 24px rgba(147, 51, 234, 0.14);
+    }
+
+    .twin-node.active {
+      background: var(--accent);
+      color: #1b1304;
+      border-color: rgba(217, 119, 6, 0.3);
+    }
+
+    .twin-node-name {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .twin-node-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .twin-node-meta {
+      font-size: 11px;
+      font-weight: 700;
+      opacity: 0.86;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .domain-electrical { background: #fbbf24; color: #231600; }
+    .domain-mechanical { background: #60a5fa; color: #091a33; }
+    .domain-thermal { background: #f87171; color: #2f0909; }
+    .domain-fluid { background: #2dd4bf; color: #042623; }
+    .domain-control { background: #c084fc; color: #25083c; }
+
+    .domain-pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 22px;
+      height: 22px;
+      border-radius: 999px;
+      font-size: 12px;
+      flex: 0 0 22px;
+    }
+
+    .twin-panel {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 24px;
+      background: rgba(255, 255, 255, 0.84);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+    }
+
+    .twin-panel h3 {
+      font-size: 24px;
+      line-height: 1.1;
+    }
+
+    .twin-panel .chip {
+      width: fit-content;
+    }
+
+    .simulate-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: rgba(255,255,255,0.72);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+    }
+
+    .toggle {
+      position: relative;
+      width: 52px;
+      height: 30px;
+      border-radius: 999px;
+      border: 0;
+      background: rgba(20, 33, 61, 0.14);
+      padding: 0;
+    }
+
+    .toggle::after {
+      content: "";
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform 180ms ease;
+    }
+
+    .toggle.on {
+      background: var(--accent);
+    }
+
+    .toggle.on::after {
+      transform: translateX(22px);
+    }
+
+    .twin-chain {
+      display: grid;
+      gap: 8px;
+    }
+
+    .twin-step {
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+      font-size: 13px;
+      color: var(--ink);
+    }
+
+    .twin-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .solver-grid {
+      display: grid;
+      gap: 10px;
+    }
+
+    .solver-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 120px;
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 14px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1px solid rgba(20, 33, 61, 0.08);
+    }
+
+    .solver-meta {
+      min-width: 0;
+    }
+
+    .solver-name {
+      font-size: 13px;
+      font-weight: 800;
+      overflow-wrap: anywhere;
+    }
+
+    .solver-unit {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .solver-row input {
+      width: 100%;
+      min-width: 0;
+      text-align: right;
+    }
+
+    .solve-button {
+      background: var(--ink);
+      color: #fff;
+      border: 1px solid transparent;
+      font-weight: 800;
+      padding: 11px 16px;
+      border-radius: 999px;
+      width: fit-content;
+    }
+
+    .solver-result {
+      padding: 14px 16px;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(20, 33, 61, 0.96), rgba(31, 77, 112, 0.96));
+      color: #fbf7f0;
+    }
+
+    body.theme-dark .twin-window,
+    body.theme-dark .twin-stage,
+    body.theme-dark .twin-panel,
+    body.theme-dark .twin-step,
+    body.theme-dark .twin-river-label,
+    body.theme-dark .twin-node,
+    body.theme-dark .simulate-bar,
+    body.theme-dark .solver-row {
+      background: rgba(15, 23, 42, 0.9);
+      border-color: rgba(148, 163, 184, 0.16);
+      color: var(--ink);
+    }
+
+    body.theme-dark .twin-button {
+      color: #111827;
+    }
+
+    body.theme-dark .twin-modal {
+      background: rgba(2, 6, 23, 0.62);
+    }
+
+    body.theme-dark .twin-stage::before,
+    body.theme-dark .twin-stage::after {
+      box-shadow: 0 0 0 1px rgba(148, 163, 184, 0.14);
+    }
+
+    body.theme-dark .twin-link {
+      background: rgba(148, 163, 184, 0.24);
+    }
+
+    body.theme-dark .twin-chain-touch {
+      background: rgba(15, 23, 42, 0.92);
+      border-color: rgba(148, 163, 184, 0.22);
+    }
+
+    body.theme-dark .solve-button {
+      background: var(--accent);
+      color: #111827;
+    }
+
+    .twin-modal {
+      background: rgba(2, 4, 10, 0.72);
+      backdrop-filter: blur(12px);
+      padding: 12px;
+    }
+
+    .twin-window {
+      width: min(1500px, 100%);
+      height: min(94vh, 980px);
+      max-height: none;
+      overflow: hidden;
+      padding: 0;
+      border-radius: 10px;
+      background: #0a0a0f;
+      border: 1px solid #ffffff15;
+      box-shadow: none;
+      gap: 0;
+    }
+
+    .scada-shell {
+      height: 100%;
+      display: grid;
+      grid-template-rows: 58px minmax(0, 1fr);
+      background: #0a0a0f;
+      color: #f5f7fb;
+      font-family: Inter, system-ui, sans-serif;
+      letter-spacing: -0.01em;
+    }
+
+    .scada-topbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) auto auto;
+      align-items: center;
+      gap: 16px;
+      padding: 0 18px;
+      border-bottom: 1px solid #ffffff15;
+      background: #0d0d14;
+    }
+
+    .scada-title {
+      display: grid;
+      gap: 2px;
+    }
+
+    .scada-title strong {
+      font-size: 15px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .scada-title span {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #888;
+    }
+
+    .scada-top-controls,
+    .scada-top-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .scada-top-actions {
+      justify-self: end;
+    }
+
+    .scada-btn {
+      appearance: none;
+      border: 1px solid #ffffff15;
+      border-radius: 4px;
+      background: #12121a;
+      color: #f5f7fb;
+      padding: 8px 12px;
+      min-width: 40px;
+      min-height: 34px;
+      font: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      transition: border-color 140ms ease, background 140ms ease;
+    }
+
+    .scada-btn:hover {
+      transform: none;
+      border-color: #ffffff35;
+      background: #171723;
+    }
+
+    .scada-btn.close {
+      padding-inline: 10px;
+      font-size: 14px;
+      line-height: 1;
+    }
+
+    .scada-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 10px;
+      border: 1px solid #ffffff15;
+      border-radius: 4px;
+      background: #12121a;
+      color: #888;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .scada-toggle.on {
+      color: #f5f7fb;
+    }
+
+    .scada-switch {
+      position: relative;
+      width: 44px;
+      height: 20px;
+      border: 1px solid #ffffff20;
+      background: #08080d;
+    }
+
+    .scada-switch::after {
+      content: "";
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 16px;
+      height: 14px;
+      background: #7f8a96;
+      transition: transform 160ms ease, background 160ms ease;
+    }
+
+    .scada-toggle.on .scada-switch::after {
+      transform: translateX(22px);
+      background: #7fa88b;
+    }
+
+    .scada-layout {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 320px;
+    }
+
+    .scada-canvas {
+      min-width: 0;
+      position: relative;
+      background: #050508;
+      height: 100%;
+      min-height: 600px;
+    }
+
+    .scada-detail {
+      min-width: 0;
+      display: grid;
+      align-content: start;
+      gap: 14px;
+      padding: 18px;
+      background: #0d0d14;
+      border-left: 1px solid #ffffff15;
+      color: #ffffff;
+      overflow: auto;
+    }
+
+    .scada-empty {
+      display: grid;
+      gap: 8px;
+      padding-top: 10px;
+    }
+
+    .scada-empty strong,
+    .detail-head strong {
+      font-size: 18px;
+      font-weight: 600;
+      color: #ffffff;
+    }
+
+    .scada-empty p,
+    .detail-sub,
+    .formula-caption {
+      color: #888;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .detail-head {
+      display: grid;
+      gap: 8px;
+      padding-right: 28px;
+      position: relative;
+    }
+
+    .detail-close {
+      position: absolute;
+      top: 0;
+      right: 0;
+    }
+
+    .detail-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .detail-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #ffffff15;
+      border-radius: 4px;
+      padding: 5px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #b7bec7;
+      background: #111119;
+    }
+
+    .detail-formula {
+      display: grid;
+      gap: 6px;
+    }
+
+    .formula-block,
+    .result-block {
+      border: 1px solid #ffffff15;
+      border-radius: 4px;
+      background: #12121a;
+      padding: 12px;
+      font-family: "SFMono-Regular", Menlo, monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #f2f5f8;
+      overflow-wrap: anywhere;
+    }
+
+    .component-inputs {
+      display: grid;
+      gap: 8px;
+    }
+
+    .component-input-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 112px;
+      gap: 10px;
+      align-items: center;
+      border: 1px solid #ffffff15;
+      background: #12121a;
+      border-radius: 4px;
+      padding: 9px 10px;
+    }
+
+    .component-input-row strong {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #ffffff;
+      margin-bottom: 3px;
+    }
+
+    .component-input-row span {
+      font-size: 11px;
+      color: #888;
+      font-family: "SFMono-Regular", Menlo, monospace;
+    }
+
+    .component-input-row input {
+      width: 100%;
+      min-width: 0;
+      padding: 9px 10px;
+      border-radius: 0;
+      border: 1px solid #ffffff15;
+      background: #09090d;
+      color: #f5f7fb;
+      font-family: "SFMono-Regular", Menlo, monospace;
+      text-align: right;
+    }
+
+    .component-input-row input:focus {
+      outline: none;
+      border-color: #00ff9d;
+      color: #00ff9d;
+      box-shadow: none;
+    }
+
+    .scada-solve {
+      width: 100%;
+      justify-content: center;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .scada-btn.active-3d {
+      background: #4a9eff25;
+      border-color: #4a9eff50;
+      color: #4a9eff;
+    }
+
+    .twin-react-root {
+      width: 100%;
+      height: 100%;
+      background: #050508;
+    }
+
+    .rf-zone {
+      fill: rgba(18, 18, 26, 0.2);
+      stroke: #ffffff10;
+      stroke-width: 1;
+    }
+
+    text.rf-zone-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      fill: #626a74;
+      font-family: Inter, system-ui, sans-serif;
+    }
+
+    .rf-river {
+      fill: url(#riverGradient);
+      stroke: #ffffff15;
+      stroke-width: 1;
+    }
+
+    .rf-river.simulating {
+      animation: riverGlow 3s ease-in-out infinite;
+    }
+
+    @keyframes riverGlow {
+      0%, 100% { stroke: #ffffff15; }
+      50% { stroke: #ffffff35; }
+    }
+
+    text.rf-river-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      fill: #97a1ad;
+      font-family: Inter, system-ui, sans-serif;
+    }
+
+    .rf-contact {
+      fill: #12121a;
+      stroke: #ffffff28;
+      stroke-width: 1;
+    }
+
+    .rf-component-node {
+      transition: stroke 120ms ease, fill 120ms ease;
+    }
+
+    .rf-component-node.selected {
+      stroke: #ffffff60;
+    }
+
+    .rf-component-node.simulating {
+      animation: nodePulse 2s ease-in-out infinite;
+    }
+
+    @keyframes nodePulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.92; }
+    }
+
+    @media (max-width: 1180px) {
+      .formula-shell {
+        grid-template-columns: 1fr;
+      }
+
+      .formula-sidebar,
+      .formula-inspector {
+        position: static;
+        min-height: auto;
+      }
+
+      .summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .twin-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .scada-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .scada-detail {
+        border-left: 0;
+        border-top: 1px solid #ffffff15;
+        max-height: 38vh;
+      }
+    }
+
+    @media (max-width: 820px) {
+      .setup,
+      .ports,
+      .hero-stats,
+      .detail-grid,
+      .summary-grid,
+      .stats-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .app-shell {
+        width: min(100%, calc(100% - 20px));
+        margin: 10px auto 28px;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+      }
+
+      .workspace.sidebar-collapsed {
+        grid-template-columns: 1fr;
+      }
+
+      .panel,
+      .formula-sidebar,
+      .formula-library {
+        padding: 16px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="app-shell">
+    <div class="workspace">
+      <aside class="panel sidebar">
+        <div class="sidebar-top">
+          <div class="sidebar-copy">
+            <div class="sidebar-brand">
+              <span class="brand-mark">F</span>
+              <span class="brand-text">
+                <strong>Faulter Webapp</strong>
+              </span>
+            </div>
+          </div>
+          <button id="sidebarToggle" class="icon-button" type="button" title="Collapse">
+            <span class="action-icon">◧</span>
+            <span class="action-label">Collapse</span>
+          </button>
+        </div>
+        <div class="sidebar-actions">
+          <button id="themeToggle" class="icon-button" type="button">
+            <span class="action-icon">◐</span>
+            <span class="action-label">Dark theme</span>
+          </button>
+        </div>
+        <div class="sidebar-nav" id="tabbar">
+          <button class="tab-button active" data-section="formula-section" title="Formulas">
+            <span class="nav-icon">ƒ</span>
+            <span class="nav-label">Formulas</span>
+          </button>
+          <button class="tab-button" data-section="nassenger-section" title="Nassenger 8">
+            <span class="nav-icon">N8</span>
+            <span class="nav-label">Nassenger 8</span>
+          </button>
+        </div>
+        <div class="stats-grid sidebar-stats">
+          <div class="detail">
+            <label>Formulas</label>
+            <strong>61</strong>
+          </div>
+          <div class="detail">
+            <label>Workers</label>
+            <strong>16</strong>
+          </div>
+        </div>
+      </aside>
+
+      <div class="content-stack">
+        <section id="formula-section" class="app-section active">
+          <section class="panel section-hero">
+            <div class="eyebrow">Formula Deck</div>
+            <h2>Engineering formula database</h2>
+            <p>Search, filter, inspect, and calculate across the full formula set inside the same app window.</p>
+          </section>
+          <div class="formula-shell">
+            <aside class="formula-sidebar">
+              <div>
+                <div class="section-label">Deck Summary</div>
+                <p class="description" style="margin-top: 10px;">The database keeps all engineering templates available for inspection and live calculation.</p>
+              </div>
+              <div class="stats-grid">
+                <div class="detail">
+                  <label>Total</label>
+                  <strong id="stat-formulas">61</strong>
+                </div>
+                <div class="detail">
+                  <label>Domains</label>
+                  <strong id="stat-categories">9</strong>
+                </div>
+              </div>
+              <div>
+                <div class="section-label">Categories</div>
+                <div id="category-list" class="category-list" style="margin-top: 10px;"></div>
+              </div>
+            </aside>
+
+            <section class="formula-library">
+              <div class="formula-toolbar">
+                <input id="search-input" type="search" placeholder="Search formulas, tags, variables, or domains">
+                <div id="result-count" class="subtle"></div>
+              </div>
+              <div id="card-grid" class="card-grid"></div>
+            </section>
+          </div>
+          <div id="inspector-modal" class="inspector-modal" aria-hidden="true">
+            <div class="inspector-window">
+              <div class="inspector-window-top">
+                <div>
+                  <div class="eyebrow">Inspector</div>
+                  <h2 id="inspector-title" style="margin-top: 8px;">Select a formula</h2>
+                  <p id="inspector-description" class="description" style="margin-top: 8px;">Pick a card to inspect its JSON structure and solve the default target live.</p>
+                </div>
+                <button id="inspector-close" class="close-button" type="button">Close</button>
+              </div>
+              <div id="inspector-body"></div>
+            </div>
+          </div>
+        </section>
+
+        <section id="nassenger-section" class="app-section">
+          <div class="nassenger-shell">
+            <section class="panel section-hero">
+              <div class="eyebrow">Nassenger 8</div>
+              <h2>Worker map</h2>
+              <p>This window defines the worker chains only. No formulas, rules, or assignments have been attached yet.</p>
+            </section>
+
+            <div class="summary-grid">
+              <div class="summary-card">
+                <div class="section-label">Defined workers</div>
+                <h3 style="margin-top: 8px;">16</h3>
+                <p class="description" style="margin-top: 8px;">Primary workers modeled in the machine.</p>
+              </div>
+              <div class="summary-card">
+                <div class="section-label">Parallel sub-workers</div>
+                <h3 style="margin-top: 8px;">8</h3>
+                <p class="description" style="margin-top: 8px;">Worker 7 runs eight color-channel mini-workers.</p>
+              </div>
+              <div class="summary-card">
+                <div class="section-label">Full-print total</div>
+                <h3 style="margin-top: 8px;">23</h3>
+                <p class="description" style="margin-top: 8px;">Distinct worker chains active when printing at speed.</p>
+              </div>
+              <div class="summary-card">
+                <div class="section-label">Print river</div>
+                <h3 style="margin-top: 8px;">Roll to rewind</h3>
+                <p class="description" style="margin-top: 8px;">Fabric moves through unwind, print, dry, and rewind stages.</p>
+              </div>
+            </div>
+
+            <section class="flow-card">
+              <div class="section-label">Fabric River</div>
+              <div class="flow-river">
+                <span class="flow-node">Roll</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-node">Unwind</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-node">Print zone</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-node">Dry</span>
+                <span class="flow-arrow">→</span>
+                <span class="flow-node">Rewind</span>
+              </div>
+            </section>
+
+            <section>
+              <div class="workers-grid" id="workers-grid"></div>
+            </section>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const formulas = [
+      { id: "EL-01", category: "Electrical", name: "Ohm's Law", formula: "V = I × R", variables: { V: { name: "Voltage", unit: "V", default: 12 }, I: { name: "Current", unit: "A", default: 2 }, R: { name: "Resistance", unit: "ohm", default: 6 } }, solveFor: "V", description: "Relates voltage, current, and resistance in a linear conductor.", domain: "Electrical", tags: ["motor", "circuit", "basic"], compute: v => v.I * v.R },
+      { id: "EL-02", category: "Electrical", name: "DC Motor Back-EMF", formula: "E_b = K_e × omega", variables: { Eb: { name: "Back EMF", unit: "V", default: 24 }, Ke: { name: "Back EMF constant", unit: "V·s/rad", default: 0.12 }, omega: { name: "Angular speed", unit: "rad/s", default: 200 } }, solveFor: "Eb", description: "Estimates generated counter-voltage in a DC motor from speed and motor constant.", domain: "Electrical", tags: ["motor", "back-emf", "drive"], compute: v => v.Ke * v.omega },
+      { id: "EL-03", category: "Electrical", name: "Motor Electrical Time Constant", formula: "tau_e = L / R", variables: { tau_e: { name: "Electrical time constant", unit: "s", default: 0.004 }, L: { name: "Inductance", unit: "H", default: 0.02 }, R: { name: "Resistance", unit: "ohm", default: 5 } }, solveFor: "tau_e", description: "Describes current rise dynamics in a motor winding or inductive load.", domain: "Electrical", tags: ["motor", "inductor", "transient"], compute: v => v.L / v.R },
+      { id: "EL-04", category: "Electrical", name: "Power Dissipation", formula: "P = I^2 × R", variables: { P: { name: "Power", unit: "W", default: 48 }, I: { name: "Current", unit: "A", default: 4 }, R: { name: "Resistance", unit: "ohm", default: 3 } }, solveFor: "P", description: "Computes resistive heat generation under current flow.", domain: "Electrical", tags: ["heat", "loss", "power"], compute: v => v.I * v.I * v.R },
+      { id: "EL-05", category: "Electrical", name: "RC Charge/Discharge", formula: "V(t) = V_s × (1 - e^(-t / (R × C)))", variables: { Vt: { name: "Capacitor voltage", unit: "V", default: 7.59 }, Vs: { name: "Supply voltage", unit: "V", default: 12 }, t: { name: "Time", unit: "s", default: 1 }, R: { name: "Resistance", unit: "ohm", default: 1000 }, C: { name: "Capacitance", unit: "F", default: 0.001 } }, solveFor: "Vt", description: "Gives capacitor voltage during a first-order RC charging transient.", domain: "Electrical", tags: ["rc", "transient", "capacitor"], compute: v => v.Vs * (1 - Math.exp(-v.t / (v.R * v.C))) },
+      { id: "EL-06", category: "Electrical", name: "PWM Duty Cycle to Voltage", formula: "V_avg = D × V_in", variables: { Vavg: { name: "Average voltage", unit: "V", default: 9.6 }, D: { name: "Duty cycle", unit: "ratio", default: 0.8 }, Vin: { name: "Input voltage", unit: "V", default: 12 } }, solveFor: "Vavg", description: "Approximates average output voltage of a PWM-driven load.", domain: "Electrical", tags: ["pwm", "drive", "converter"], compute: v => v.D * v.Vin },
+      { id: "EL-07", category: "Electrical", name: "Three-Phase Power", formula: "P = sqrt(3) × V_L × I_L × cos(phi)", variables: { P: { name: "Active power", unit: "W", default: 5609.82 }, VL: { name: "Line voltage", unit: "V", default: 400 }, IL: { name: "Line current", unit: "A", default: 9 }, pf: { name: "Power factor", unit: "ratio", default: 0.9 } }, solveFor: "P", description: "Calculates active power in a balanced three-phase electrical system.", domain: "Electrical", tags: ["three-phase", "ac", "power"], compute: v => Math.sqrt(3) * v.VL * v.IL * v.pf },
+      { id: "EL-08", category: "Electrical", name: "Transformer Voltage", formula: "V_s / V_p = N_s / N_p", variables: { Vs: { name: "Secondary voltage", unit: "V", default: 24 }, Vp: { name: "Primary voltage", unit: "V", default: 120 }, Ns: { name: "Secondary turns", unit: "turns", default: 200 }, Np: { name: "Primary turns", unit: "turns", default: 1000 } }, solveFor: "Vs", description: "Relates transformer turns ratio to ideal primary and secondary voltage levels.", domain: "Electrical", tags: ["transformer", "ac", "magnetics"], compute: v => v.Vp * (v.Ns / v.Np) },
+      { id: "ME-01", category: "Mechanical", name: "Newton's 2nd Law Linear", formula: "F = m × a", variables: { F: { name: "Force", unit: "N", default: 25 }, m: { name: "Mass", unit: "kg", default: 5 }, a: { name: "Acceleration", unit: "m/s^2", default: 5 } }, solveFor: "F", description: "Links linear acceleration to mass and the net force applied.", domain: "Mechanical", tags: ["motion", "actuation", "basic"], compute: v => v.m * v.a },
+      { id: "ME-02", category: "Mechanical", name: "Rotational Dynamics", formula: "T = J × alpha", variables: { T: { name: "Torque", unit: "N·m", default: 1.6 }, J: { name: "Inertia", unit: "kg·m^2", default: 0.08 }, alpha: { name: "Angular acceleration", unit: "rad/s^2", default: 20 } }, solveFor: "T", description: "Rotational analog of Newton's second law for accelerating inertia.", domain: "Mechanical", tags: ["torque", "inertia", "motor"], compute: v => v.J * v.alpha },
+      { id: "ME-03", category: "Mechanical", name: "Belt Tension Ratio (Euler-Eytelwein)", formula: "T1 / T2 = e^(mu × theta)", variables: { ratio: { name: "Tension ratio", unit: "ratio", default: 2.57 }, mu: { name: "Friction coefficient", unit: "ratio", default: 0.25 }, theta: { name: "Wrap angle", unit: "rad", default: 3.78 } }, solveFor: "ratio", description: "Determines traction capability of a belt wrapped around a pulley.", domain: "Mechanical", tags: ["belt", "friction", "drive"], compute: v => Math.exp(v.mu * v.theta) },
+      { id: "ME-04", category: "Mechanical", name: "Bearing Friction Torque", formula: "T_f = mu × W × r", variables: { Tf: { name: "Friction torque", unit: "N·m", default: 0.12 }, mu: { name: "Effective friction coefficient", unit: "ratio", default: 0.02 }, W: { name: "Bearing load", unit: "N", default: 200 }, r: { name: "Mean radius", unit: "m", default: 0.03 } }, solveFor: "Tf", description: "Approximates resisting torque created by friction under radial load.", domain: "Mechanical", tags: ["bearing", "loss", "torque"], compute: v => v.mu * v.W * v.r },
+      { id: "ME-05", category: "Mechanical", name: "Gear Speed Ratio", formula: "omega_out = omega_in × (N_in / N_out)", variables: { omega_out: { name: "Output speed", unit: "rpm", default: 600 }, omega_in: { name: "Input speed", unit: "rpm", default: 1800 }, Nin: { name: "Input gear teeth", unit: "teeth", default: 20 }, Nout: { name: "Output gear teeth", unit: "teeth", default: 60 } }, solveFor: "omega_out", description: "Converts rotational speed through a simple ideal gear pair.", domain: "Mechanical", tags: ["gear", "ratio", "transmission"], compute: v => v.omega_in * (v.Nin / v.Nout) },
+      { id: "ME-06", category: "Mechanical", name: "Fatigue Life S-N Curve", formula: "N = (sigma_f' / sigma_a)^(1 / b)", variables: { N: { name: "Cycles to failure", unit: "cycles", default: 244140625 }, sigma_f: { name: "Fatigue strength coefficient", unit: "MPa", default: 1000 }, sigma_a: { name: "Alternating stress", unit: "MPa", default: 150 }, b: { name: "Basquin exponent magnitude", unit: "ratio", default: 0.3 } }, solveFor: "N", description: "Estimates fatigue life from an S-N relation using Basquin-style behavior.", domain: "Mechanical", tags: ["fatigue", "life", "stress"], compute: v => Math.pow(v.sigma_f / v.sigma_a, 1 / v.b) },
+      { id: "ME-07", category: "Mechanical", name: "Hertz Contact Stress", formula: "sigma_H = sqrt((6 × F × E') / (pi^3 × b × d))", variables: { sigma_H: { name: "Contact stress", unit: "Pa", default: 12339714.651 }, F: { name: "Normal load", unit: "N", default: 500 }, Eprime: { name: "Equivalent modulus", unit: "Pa", default: 210000000000 }, b: { name: "Contact width", unit: "m", default: 0.01 }, d: { name: "Contact diameter", unit: "m", default: 0.04 } }, solveFor: "sigma_H", description: "Approximates contact stress for concentrated line or point contact under load.", domain: "Mechanical", tags: ["contact", "stress", "bearing"], compute: v => Math.sqrt((6 * v.F * v.Eprime) / (Math.PI ** 3 * v.b * v.d)) },
+      { id: "ME-08", category: "Mechanical", name: "Vibration Natural Frequency", formula: "f_n = (1 / (2pi)) × sqrt(k / m)", variables: { fn: { name: "Natural frequency", unit: "Hz", default: 5.03 }, k: { name: "Stiffness", unit: "N/m", default: 5000 }, m: { name: "Mass", unit: "kg", default: 5 } }, solveFor: "fn", description: "Predicts resonant frequency of a single-degree-of-freedom spring-mass system.", domain: "Mechanical", tags: ["vibration", "resonance", "stiffness"], compute: v => (1 / (2 * Math.PI)) * Math.sqrt(v.k / v.m) },
+      { id: "ME-09", category: "Mechanical", name: "Beam Deflection", formula: "delta = (F × L^3) / (3 × E × I)", variables: { delta: { name: "Tip deflection", unit: "m", default: 0.00159 }, F: { name: "End load", unit: "N", default: 100 }, L: { name: "Beam length", unit: "m", default: 0.5 }, E: { name: "Young's modulus", unit: "Pa", default: 200000000000 }, I: { name: "Second moment of area", unit: "m^4", default: 1.31e-8 } }, solveFor: "delta", description: "Gives cantilever tip deflection under an end load using Euler-Bernoulli theory.", domain: "Mechanical", tags: ["beam", "stiffness", "structure"], compute: v => (v.F * Math.pow(v.L, 3)) / (3 * v.E * v.I) },
+      { id: "ME-10", category: "Mechanical", name: "Torque-Speed Curve", formula: "T = T_stall × (1 - omega / omega_no-load)", variables: { T: { name: "Torque", unit: "N·m", default: 0.6 }, Tstall: { name: "Stall torque", unit: "N·m", default: 1.2 }, omega: { name: "Operating speed", unit: "rpm", default: 1500 }, omega_nl: { name: "No-load speed", unit: "rpm", default: 3000 } }, solveFor: "T", description: "Approximates the linear torque drop of an ideal DC motor with speed.", domain: "Mechanical", tags: ["motor", "performance", "drive"], compute: v => v.Tstall * (1 - v.omega / v.omega_nl) },
+      { id: "TH-01", category: "Thermal", name: "Fourier Conduction", formula: "Q = k × A × DeltaT / L", variables: { Q: { name: "Heat flow", unit: "W", default: 40 }, k: { name: "Thermal conductivity", unit: "W/m·K", default: 200 }, A: { name: "Area", unit: "m^2", default: 0.01 }, DeltaT: { name: "Temperature difference", unit: "K", default: 20 }, L: { name: "Thickness", unit: "m", default: 1 } }, solveFor: "Q", description: "Computes steady conduction heat transfer through a slab.", domain: "Thermal", tags: ["conduction", "heat", "steady-state"], compute: v => (v.k * v.A * v.DeltaT) / v.L },
+      { id: "TH-02", category: "Thermal", name: "Newton's Cooling", formula: "Q = h × A × (T_s - T_inf)", variables: { Q: { name: "Convective heat flow", unit: "W", default: 60 }, h: { name: "Convection coefficient", unit: "W/m^2·K", default: 15 }, A: { name: "Surface area", unit: "m^2", default: 0.2 }, Ts: { name: "Surface temperature", unit: "C", default: 45 }, Tinf: { name: "Ambient temperature", unit: "C", default: 25 } }, solveFor: "Q", description: "Estimates convective heat rejection from a surface to ambient fluid.", domain: "Thermal", tags: ["convection", "cooling", "surface"], compute: v => v.h * v.A * (v.Ts - v.Tinf) },
+      { id: "TH-03", category: "Thermal", name: "Stefan-Boltzmann Radiation", formula: "Q = epsilon × sigma × A × (T_s^4 - T_sur^4)", variables: { Q: { name: "Radiative heat flow", unit: "W", default: 282.79 }, epsilon: { name: "Emissivity", unit: "ratio", default: 0.9 }, A: { name: "Area", unit: "m^2", default: 1 }, Ts: { name: "Surface temperature", unit: "K", default: 400 }, Tsur: { name: "Surroundings temperature", unit: "K", default: 300 } }, solveFor: "Q", description: "Calculates net radiative heat transfer between a surface and surroundings.", domain: "Thermal", tags: ["radiation", "heat", "infrared"], compute: v => v.epsilon * 5.670374419e-8 * v.A * (Math.pow(v.Ts, 4) - Math.pow(v.Tsur, 4)) },
+      { id: "TH-04", category: "Thermal", name: "Thermal Resistance", formula: "R_th = L / (k × A)", variables: { Rth: { name: "Thermal resistance", unit: "K/W", default: 0.25 }, L: { name: "Thickness", unit: "m", default: 0.005 }, k: { name: "Thermal conductivity", unit: "W/m·K", default: 200 }, A: { name: "Area", unit: "m^2", default: 0.0001 } }, solveFor: "Rth", description: "Represents opposition to conduction heat transfer through a layer.", domain: "Thermal", tags: ["resistance", "conduction", "stackup"], compute: v => v.L / (v.k * v.A) },
+      { id: "TH-05", category: "Thermal", name: "Heat Capacity", formula: "Q = m × c_p × DeltaT", variables: { Q: { name: "Stored heat", unit: "J", default: 20900 }, m: { name: "Mass", unit: "kg", default: 5 }, cp: { name: "Specific heat", unit: "J/kg·K", default: 4180 }, DeltaT: { name: "Temperature rise", unit: "K", default: 1 } }, solveFor: "Q", description: "Determines heat needed to raise the temperature of a thermal mass.", domain: "Thermal", tags: ["storage", "specific-heat", "mass"], compute: v => v.m * v.cp * v.DeltaT },
+      { id: "TH-06", category: "Thermal", name: "Thermal Time Constant", formula: "tau = R_th × C_th", variables: { tau: { name: "Time constant", unit: "s", default: 50 }, Rth: { name: "Thermal resistance", unit: "K/W", default: 2 }, Cth: { name: "Thermal capacitance", unit: "J/K", default: 25 } }, solveFor: "tau", description: "Characterizes transient temperature response in first-order thermal systems.", domain: "Thermal", tags: ["transient", "thermal-mass", "response"], compute: v => v.Rth * v.Cth },
+      { id: "TH-07", category: "Thermal", name: "Arrhenius Equation", formula: "k = A × e^(-E_a / (R × T))", variables: { k: { name: "Reaction rate constant", unit: "1/s", default: 0.444 }, A: { name: "Pre-exponential factor", unit: "1/s", default: 1000 }, Ea: { name: "Activation energy", unit: "J/mol", default: 20000 }, T: { name: "Absolute temperature", unit: "K", default: 350 } }, solveFor: "k", description: "Models temperature dependence of chemical or degradation reaction rates.", domain: "Thermal", tags: ["arrhenius", "aging", "chemistry"], compute: v => v.A * Math.exp(-v.Ea / (8.314 * v.T)) },
+      { id: "TH-08", category: "Thermal", name: "Psychrometric Enthalpy", formula: "h = 1.006 × T + W × (2501 + 1.86 × T)", variables: { h: { name: "Moist air enthalpy", unit: "kJ/kg_dry_air", default: 50.61 }, T: { name: "Dry bulb temperature", unit: "C", default: 25 }, W: { name: "Humidity ratio", unit: "kg/kg", default: 0.01 } }, solveFor: "h", description: "Estimates total specific enthalpy of moist air from temperature and humidity ratio.", domain: "Thermal", tags: ["humidity", "air", "hvac"], compute: v => 1.006 * v.T + v.W * (2501 + 1.86 * v.T) },
+      { id: "FL-01", category: "Fluid / Ink", name: "Hagen-Poiseuille", formula: "Q = (pi × r^4 × DeltaP) / (8 × mu × L)", variables: { Q: { name: "Volumetric flow rate", unit: "m^3/s", default: 0.00001227 }, r: { name: "Tube radius", unit: "m", default: 0.005 }, DeltaP: { name: "Pressure drop", unit: "Pa", default: 5000 }, mu: { name: "Dynamic viscosity", unit: "Pa·s", default: 0.001 }, L: { name: "Tube length", unit: "m", default: 1 } }, solveFor: "Q", description: "Predicts laminar flow rate through a cylindrical capillary or channel.", domain: "Fluid / Ink", tags: ["flow", "viscosity", "capillary"], compute: v => (Math.PI * Math.pow(v.r, 4) * v.DeltaP) / (8 * v.mu * v.L) },
+      { id: "FL-02", category: "Fluid / Ink", name: "Reynolds Number", formula: "Re = (rho × v × D) / mu", variables: { Re: { name: "Reynolds number", unit: "ratio", default: 1000 }, rho: { name: "Density", unit: "kg/m^3", default: 1000 }, v: { name: "Velocity", unit: "m/s", default: 1 }, D: { name: "Hydraulic diameter", unit: "m", default: 0.001 }, mu: { name: "Dynamic viscosity", unit: "Pa·s", default: 0.001 } }, solveFor: "Re", description: "Classifies flow regime by comparing inertial and viscous effects.", domain: "Fluid / Ink", tags: ["dimensionless", "flow", "transition"], compute: v => (v.rho * v.v * v.D) / v.mu },
+      { id: "FL-03", category: "Fluid / Ink", name: "Bernoulli", formula: "P + 0.5 × rho × v^2 + rho × g × z = constant", variables: { E: { name: "Specific energy term", unit: "Pa", default: 15155 }, P: { name: "Static pressure", unit: "Pa", default: 5000 }, rho: { name: "Density", unit: "kg/m^3", default: 1000 }, v: { name: "Velocity", unit: "m/s", default: 3 }, z: { name: "Elevation", unit: "m", default: 1 } }, solveFor: "E", description: "Represents conservation of mechanical energy in steady incompressible flow.", domain: "Fluid / Ink", tags: ["pressure", "velocity", "energy"], compute: v => v.P + 0.5 * v.rho * v.v * v.v + v.rho * 9.81 * v.z },
+      { id: "FL-04", category: "Fluid / Ink", name: "Continuity Equation", formula: "Q = A × v", variables: { Q: { name: "Volumetric flow rate", unit: "m^3/s", default: 0.0002 }, A: { name: "Cross-sectional area", unit: "m^2", default: 0.0001 }, v: { name: "Velocity", unit: "m/s", default: 2 } }, solveFor: "Q", description: "Connects area and velocity for incompressible steady flow.", domain: "Fluid / Ink", tags: ["mass-balance", "channel", "flow"], compute: v => v.A * v.v },
+      { id: "FL-05", category: "Fluid / Ink", name: "Young-Laplace Surface Tension", formula: "DeltaP = 2 × gamma / r", variables: { DeltaP: { name: "Pressure jump", unit: "Pa", default: 2880 }, gamma: { name: "Surface tension", unit: "N/m", default: 0.072 }, r: { name: "Droplet radius", unit: "m", default: 0.00005 } }, solveFor: "DeltaP", description: "Relates curvature and surface tension to pressure across a liquid interface.", domain: "Fluid / Ink", tags: ["surface", "droplet", "pressure"], compute: v => (2 * v.gamma) / v.r },
+      { id: "FL-06", category: "Fluid / Ink", name: "Capillary Pressure", formula: "P_c = 2 × gamma × cos(theta) / r", variables: { Pc: { name: "Capillary pressure", unit: "Pa", default: 2494.15 }, gamma: { name: "Surface tension", unit: "N/m", default: 0.072 }, theta: { name: "Contact angle", unit: "deg", default: 30 }, r: { name: "Capillary radius", unit: "m", default: 0.00005 } }, solveFor: "Pc", description: "Determines capillary suction or retention in porous and nozzle structures.", domain: "Fluid / Ink", tags: ["capillary", "wetting", "porous"], compute: v => (2 * v.gamma * Math.cos((v.theta * Math.PI) / 180)) / v.r },
+      { id: "FL-07", category: "Fluid / Ink", name: "Viscosity-Temperature Arrhenius", formula: "mu = mu_0 × e^(E / (R × T))", variables: { mu: { name: "Dynamic viscosity", unit: "Pa·s", default: 0.00558 }, mu0: { name: "Reference factor", unit: "Pa·s", default: 0.001 }, E: { name: "Flow activation energy", unit: "J/mol", default: 5000 }, T: { name: "Absolute temperature", unit: "K", default: 330 } }, solveFor: "mu", description: "Models viscosity change with temperature for many ink and polymer systems.", domain: "Fluid / Ink", tags: ["viscosity", "temperature", "ink"], compute: v => v.mu0 * Math.exp(v.E / (8.314 * v.T)) },
+      { id: "FL-08", category: "Fluid / Ink", name: "Darcy Filter Pressure Drop", formula: "DeltaP = (mu × L × v) / K", variables: { DeltaP: { name: "Pressure drop", unit: "Pa", default: 1000 }, mu: { name: "Dynamic viscosity", unit: "Pa·s", default: 0.001 }, L: { name: "Media thickness", unit: "m", default: 0.01 }, v: { name: "Superficial velocity", unit: "m/s", default: 0.1 }, K: { name: "Permeability", unit: "m^2", default: 1e-9 } }, solveFor: "DeltaP", description: "Estimates pressure loss across a porous filter medium.", domain: "Fluid / Ink", tags: ["filter", "darcy", "porous"], compute: v => (v.mu * v.L * v.v) / v.K },
+      { id: "IJ-01", category: "DoD Inkjet-specific", name: "Ohnesorge Number", formula: "Oh = mu / sqrt(rho × gamma × D)", variables: { Oh: { name: "Ohnesorge number", unit: "ratio", default: 0.059 }, mu: { name: "Dynamic viscosity", unit: "Pa·s", default: 0.01 }, rho: { name: "Density", unit: "kg/m^3", default: 1000 }, gamma: { name: "Surface tension", unit: "N/m", default: 0.035 }, D: { name: "Nozzle diameter", unit: "m", default: 0.0008 } }, solveFor: "Oh", description: "Compares viscous forces to inertial-capillary forces for jetting stability.", domain: "DoD Inkjet", tags: ["inkjet", "dimensionless", "stability"], compute: v => v.mu / Math.sqrt(v.rho * v.gamma * v.D) },
+      { id: "IJ-02", category: "DoD Inkjet-specific", name: "Weber Number", formula: "We = (rho × v^2 × D) / gamma", variables: { We: { name: "Weber number", unit: "ratio", default: 11.43 }, rho: { name: "Density", unit: "kg/m^3", default: 1000 }, v: { name: "Drop velocity", unit: "m/s", default: 4 }, D: { name: "Nozzle diameter", unit: "m", default: 0.0001 }, gamma: { name: "Surface tension", unit: "N/m", default: 0.035 } }, solveFor: "We", description: "Indicates droplet breakup tendency from inertial and surface tension balance.", domain: "DoD Inkjet", tags: ["inkjet", "drop", "dimensionless"], compute: v => (v.rho * v.v * v.v * v.D) / v.gamma },
+      { id: "IJ-03", category: "DoD Inkjet-specific", name: "Rayleigh Drop Volume", formula: "V_d = (pi / 6) × d^3", variables: { Vd: { name: "Drop volume", unit: "m^3", default: 5.24e-13 }, d: { name: "Drop diameter", unit: "m", default: 0.0001 } }, solveFor: "Vd", description: "Approximates droplet volume assuming a spherical detached drop.", domain: "DoD Inkjet", tags: ["drop", "volume", "geometry"], compute: v => (Math.PI / 6) * Math.pow(v.d, 3) },
+      { id: "IJ-04", category: "DoD Inkjet-specific", name: "Drop Velocity vs Voltage", formula: "v = k_v × (V_drive - V_th)", variables: { v: { name: "Drop velocity", unit: "m/s", default: 5 }, kv: { name: "Velocity gain", unit: "m/s/V", default: 0.25 }, Vdrive: { name: "Drive voltage", unit: "V", default: 30 }, Vth: { name: "Threshold voltage", unit: "V", default: 10 } }, solveFor: "v", description: "Simple empirical drive law mapping piezo drive amplitude to ejection speed.", domain: "DoD Inkjet", tags: ["drive", "velocity", "piezo"], compute: v => v.kv * (v.Vdrive - v.Vth) },
+      { id: "IJ-05", category: "DoD Inkjet-specific", name: "Drop Ballistic Landing Error", formula: "e = v_x × h / v_z", variables: { e: { name: "Landing error", unit: "m", default: 0.00004 }, vx: { name: "Lateral velocity", unit: "m/s", default: 0.02 }, h: { name: "Throw distance", unit: "m", default: 0.01 }, vz: { name: "Axial drop velocity", unit: "m/s", default: 5 } }, solveFor: "e", description: "Estimates cross-track placement error due to lateral disturbance during flight.", domain: "DoD Inkjet", tags: ["placement", "flight", "accuracy"], compute: v => (v.vx * v.h) / v.vz },
+      { id: "IJ-06", category: "DoD Inkjet-specific", name: "Piezoelectric Actuator Force", formula: "F = d_33 × E × A × Y", variables: { F: { name: "Actuation force", unit: "N", default: 0.13125 }, d33: { name: "Piezoelectric coefficient", unit: "m/V", default: 3.5e-10 }, E: { name: "Electric field", unit: "V/m", default: 1000000 }, A: { name: "Active area", unit: "m^2", default: 0.000025 }, Y: { name: "Elastic modulus", unit: "Pa", default: 15000000000 } }, solveFor: "F", description: "First-order estimate of force available from a piezoelectric drive element.", domain: "DoD Inkjet", tags: ["piezo", "actuation", "inkjet"], compute: v => v.d33 * v.E * v.A * v.Y },
+      { id: "FM-01", category: "Fabric / Material", name: "Web Tension Elastic", formula: "T = E × A × epsilon", variables: { T: { name: "Web tension", unit: "N", default: 100 }, E: { name: "Elastic modulus", unit: "Pa", default: 1000000000 }, A: { name: "Cross-section area", unit: "m^2", default: 0.0001 }, epsilon: { name: "Strain", unit: "ratio", default: 0.001 } }, solveFor: "T", description: "Links elastic strain in a moving web or fabric to resulting line tension.", domain: "Fabric / Material", tags: ["web", "tension", "elastic"], compute: v => v.E * v.A * v.epsilon },
+      { id: "FM-02", category: "Fabric / Material", name: "Newton's Drying Law", formula: "dM/dt = -k × (M - M_eq)", variables: { rate: { name: "Drying rate", unit: "kg/s", default: -0.0008 }, k: { name: "Drying constant", unit: "1/s", default: 0.02 }, M: { name: "Moisture content", unit: "kg", default: 0.08 }, Meq: { name: "Equilibrium moisture", unit: "kg", default: 0.04 } }, solveFor: "rate", description: "Models exponential moisture removal in a convective drying process.", domain: "Fabric / Material", tags: ["drying", "moisture", "fabric"], compute: v => -v.k * (v.M - v.Meq) },
+      { id: "FM-03", category: "Fabric / Material", name: "Convective Mass Transfer", formula: "N = k_c × A × (C_s - C_inf)", variables: { N: { name: "Mass transfer rate", unit: "kg/s", default: 0.0003 }, kc: { name: "Mass transfer coefficient", unit: "m/s", default: 0.005 }, A: { name: "Area", unit: "m^2", default: 0.2 }, Cs: { name: "Surface concentration", unit: "kg/m^3", default: 0.8 }, Cinf: { name: "Bulk concentration", unit: "kg/m^3", default: 0.5 } }, solveFor: "N", description: "Estimates vapor or solute transport from a wet material to the surrounding flow.", domain: "Fabric / Material", tags: ["mass-transfer", "drying", "coating"], compute: v => v.kc * v.A * (v.Cs - v.Cinf) },
+      { id: "FM-04", category: "Fabric / Material", name: "Kubelka-Munk Color", formula: "K / S = (1 - R)^2 / (2R)", variables: { KS: { name: "Kubelka-Munk ratio", unit: "ratio", default: 0.225 }, R: { name: "Reflectance", unit: "ratio", default: 0.5 } }, solveFor: "KS", description: "Maps measured reflectance to absorption-scattering ratio for dyed materials.", domain: "Fabric / Material", tags: ["color", "reflectance", "textile"], compute: v => Math.pow(1 - v.R, 2) / (2 * v.R) },
+      { id: "FM-05", category: "Fabric / Material", name: "Fabric Thermal Diffusivity", formula: "alpha = k / (rho × c_p)", variables: { alpha: { name: "Thermal diffusivity", unit: "m^2/s", default: 1.25e-7 }, k: { name: "Thermal conductivity", unit: "W/m·K", default: 0.05 }, rho: { name: "Density", unit: "kg/m^3", default: 200 }, cp: { name: "Specific heat", unit: "J/kg·K", default: 2000 } }, solveFor: "alpha", description: "Measures how quickly a fabric temperature field responds to heating.", domain: "Fabric / Material", tags: ["thermal", "fabric", "material"], compute: v => v.k / (v.rho * v.cp) },
+      { id: "CS-01", category: "Control Systems", name: "PID Controller", formula: "u = K_p × e + K_i × integral(e dt) + K_d × de/dt", variables: { u: { name: "Controller output", unit: "unitless", default: 5.3 }, Kp: { name: "Proportional gain", unit: "ratio", default: 2 }, Ki: { name: "Integral gain", unit: "1/s", default: 0.5 }, Kd: { name: "Derivative gain", unit: "s", default: 0.1 }, e: { name: "Error", unit: "process units", default: 2 }, eint: { name: "Integrated error", unit: "process units·s", default: 2 }, edot: { name: "Error derivative", unit: "process units/s", default: 3 } }, solveFor: "u", description: "Computes PID control action from proportional, integral, and derivative terms.", domain: "Control Systems", tags: ["pid", "feedback", "tuning"], compute: v => v.Kp * v.e + v.Ki * v.eint + v.Kd * v.edot },
+      { id: "CS-02", category: "Control Systems", name: "2nd Order Transfer Function", formula: "|G(jw)| = 1 / sqrt((1 - r^2)^2 + (2 × zeta × r)^2)", variables: { G: { name: "Magnitude", unit: "ratio", default: 2.5 }, zeta: { name: "Damping ratio", unit: "ratio", default: 0.2 }, r: { name: "Frequency ratio", unit: "ratio", default: 1.4 } }, solveFor: "G", description: "Evaluates magnitude response of a normalized second-order system at a chosen frequency ratio.", domain: "Control Systems", tags: ["transfer-function", "resonance", "frequency-response"], compute: v => 1 / Math.sqrt(Math.pow(1 - v.r * v.r, 2) + Math.pow(2 * v.zeta * v.r, 2)) },
+      { id: "CS-03", category: "Control Systems", name: "Disturbance Observer", formula: "d_hat = Q × (y - P_n × u)", variables: { dhat: { name: "Estimated disturbance", unit: "process units", default: 0.15 }, Q: { name: "Observer filter gain", unit: "ratio", default: 0.75 }, y: { name: "Measured output", unit: "process units", default: 1.2 }, Pn: { name: "Nominal plant gain", unit: "ratio", default: 0.9 }, u: { name: "Control input", unit: "process units", default: 1.4 } }, solveFor: "dhat", description: "Produces a filtered estimate of unmodeled disturbance using nominal plant inversion logic.", domain: "Control Systems", tags: ["observer", "robustness", "estimation"], compute: v => v.Q * (v.y - v.Pn * v.u) },
+      { id: "CS-04", category: "Control Systems", name: "Encoder Position", formula: "theta = (2pi × N) / (CPR × G)", variables: { theta: { name: "Shaft angle", unit: "rad", default: 1.571 }, N: { name: "Counts observed", unit: "counts", default: 256 }, CPR: { name: "Counts per revolution", unit: "counts/rev", default: 1024 }, G: { name: "Gear ratio", unit: "ratio", default: 1 } }, solveFor: "theta", description: "Converts encoder counts to physical shaft position after gearing.", domain: "Control Systems", tags: ["encoder", "motion", "feedback"], compute: v => (2 * Math.PI * v.N) / (v.CPR * v.G) },
+      { id: "CS-05", category: "Control Systems", name: "Bode Gain Margin", formula: "GM_dB = -20 × log10(|L(jw_pc)|)", variables: { GMdB: { name: "Gain margin", unit: "dB", default: 6.02 }, Lmag: { name: "Loop magnitude at phase crossover", unit: "ratio", default: 0.5 } }, solveFor: "GMdB", description: "Converts phase-crossover loop magnitude into gain margin in decibels.", domain: "Control Systems", tags: ["bode", "stability", "margin"], compute: v => -20 * Math.log10(v.Lmag) },
+      { id: "CS-06", category: "Control Systems", name: "State-Space Representation", formula: "x_dot = A × x + B × u", variables: { xdot: { name: "State derivative", unit: "state/s", default: 0.7 }, A: { name: "State matrix scalar", unit: "1/s", default: -0.5 }, x: { name: "State", unit: "state", default: 1 }, B: { name: "Input matrix scalar", unit: "1/s", default: 0.8 }, u: { name: "Input", unit: "input units", default: 1.5 } }, solveFor: "xdot", description: "Scalar form of state-space dynamics useful for simple modeling and observers.", domain: "Control Systems", tags: ["state-space", "model", "dynamics"], compute: v => v.A * v.x + v.B * v.u },
+      { id: "RM-01", category: "Reliability / Maintenance", name: "Weibull Failure Probability", formula: "F(t) = 1 - e^(-(t / eta)^beta)", variables: { F: { name: "Failure probability", unit: "ratio", default: 0.221 }, t: { name: "Mission time", unit: "h", default: 500 }, eta: { name: "Characteristic life", unit: "h", default: 2000 }, beta: { name: "Weibull shape", unit: "ratio", default: 1.5 } }, solveFor: "F", description: "Computes cumulative probability of failure over time using a Weibull life model.", domain: "Reliability / Maintenance", tags: ["weibull", "failure", "life"], compute: v => 1 - Math.exp(-Math.pow(v.t / v.eta, v.beta)) },
+      { id: "RM-02", category: "Reliability / Maintenance", name: "MTBF", formula: "MTBF = 1 / lambda", variables: { MTBF: { name: "Mean time between failures", unit: "h", default: 5000 }, lambda: { name: "Failure rate", unit: "1/h", default: 0.0002 } }, solveFor: "MTBF", description: "Converts constant failure rate to expected mean uptime between failures.", domain: "Reliability / Maintenance", tags: ["mtbf", "uptime", "service"], compute: v => 1 / v.lambda },
+      { id: "RM-03", category: "Reliability / Maintenance", name: "Clog Risk Index", formula: "CRI = (phi_s × mu × t) / (D_n × DeltaP)", variables: { CRI: { name: "Clog risk index", unit: "ratio", default: 0.24 }, phis: { name: "Solids fraction factor", unit: "ratio", default: 0.12 }, mu: { name: "Viscosity", unit: "Pa·s", default: 0.01 }, t: { name: "Idle time", unit: "h", default: 2 }, Dn: { name: "Nozzle diameter", unit: "mm", default: 0.05 }, DeltaP: { name: "Purge pressure margin", unit: "bar", default: 0.2 } }, solveFor: "CRI", description: "Heuristic risk metric for nozzle clogging based on solids load, viscosity, idle time, and clearing margin.", domain: "Reliability / Maintenance", tags: ["clogging", "inkjet", "risk"], compute: v => (v.phis * v.mu * v.t) / (v.Dn * v.DeltaP) },
+      { id: "RM-04", category: "Reliability / Maintenance", name: "Nozzle Evaporation Rate", formula: "m_dot = h_m × A × (rho_sat - rho_inf)", variables: { mdot: { name: "Evaporation rate", unit: "kg/s", default: 5e-10 }, hm: { name: "Mass transfer coefficient", unit: "m/s", default: 0.005 }, A: { name: "Meniscus area", unit: "m^2", default: 1e-8 }, rho_sat: { name: "Saturation vapor density", unit: "kg/m^3", default: 0.0005 }, rho_inf: { name: "Ambient vapor density", unit: "kg/m^3", default: 0.00049 } }, solveFor: "mdot", description: "Approximates solvent loss from a nozzle meniscus driven by vapor concentration difference.", domain: "Reliability / Maintenance", tags: ["evaporation", "maintenance", "nozzle"], compute: v => v.hm * v.A * (v.rho_sat - v.rho_inf) },
+      { id: "RM-05", category: "Reliability / Maintenance", name: "Purge Effectiveness", formula: "eta_p = 1 - e^(-Q_p × t / V_dead)", variables: { etap: { name: "Purge effectiveness", unit: "ratio", default: 0.95 }, Qp: { name: "Purge flow rate", unit: "m^3/s", default: 0.00001 }, t: { name: "Purge time", unit: "s", default: 30 }, Vdead: { name: "Dead volume", unit: "m^3", default: 0.0001 } }, solveFor: "etap", description: "Estimates fraction of stagnant volume refreshed during a purge event.", domain: "Reliability / Maintenance", tags: ["purge", "maintenance", "refresh"], compute: v => 1 - Math.exp((-v.Qp * v.t) / v.Vdead) },
+      { id: "IP-01", category: "Image / Signal Processing", name: "Floyd-Steinberg Halftoning", formula: "e = p - q; distribute e × {7/16, 3/16, 5/16, 1/16}", variables: { e: { name: "Quantization error", unit: "levels", default: 42 }, p: { name: "Input pixel", unit: "levels", default: 170 }, q: { name: "Quantized output", unit: "levels", default: 128 } }, solveFor: "e", description: "Computes quantization error used for Floyd-Steinberg error diffusion.", domain: "Image / Signal Processing", tags: ["halftone", "error-diffusion", "print"], compute: v => v.p - v.q },
+      { id: "IP-02", category: "Image / Signal Processing", name: "Multi-pass Interleaving", formula: "pitch_eff = pitch_native / N_pass", variables: { pitch_eff: { name: "Effective line pitch", unit: "um", default: 20 }, pitch_native: { name: "Native line pitch", unit: "um", default: 80 }, Npass: { name: "Number of passes", unit: "passes", default: 4 } }, solveFor: "pitch_eff", description: "Shows how multi-pass printing improves effective sampling and banding performance.", domain: "Image / Signal Processing", tags: ["multipass", "sampling", "printhead"], compute: v => v.pitch_native / v.Npass },
+      { id: "IP-03", category: "Image / Signal Processing", name: "Dead Nozzle Compensation", formula: "I_c = (I_left + I_right) / 2", variables: { Ic: { name: "Compensated intensity", unit: "levels", default: 120 }, Ileft: { name: "Left neighbor", unit: "levels", default: 110 }, Iright: { name: "Right neighbor", unit: "levels", default: 130 } }, solveFor: "Ic", description: "Simple reconstruction rule for replacing missing data from a failed nozzle.", domain: "Image / Signal Processing", tags: ["dead-nozzle", "reconstruction", "print"], compute: v => (v.Ileft + v.Iright) / 2 },
+      { id: "IP-04", category: "Image / Signal Processing", name: "Ink Coverage to Volume", formula: "V = A × coverage × laydown", variables: { V: { name: "Ink volume", unit: "mL", default: 1.2 }, A: { name: "Printed area", unit: "m^2", default: 0.5 }, coverage: { name: "Coverage fraction", unit: "ratio", default: 0.4 }, laydown: { name: "Laydown volume density", unit: "mL/m^2", default: 6 } }, solveFor: "V", description: "Converts image area coverage into estimated delivered ink volume.", domain: "Image / Signal Processing", tags: ["coverage", "consumption", "ink"], compute: v => v.A * v.coverage * v.laydown },
+      { id: "IP-05", category: "Image / Signal Processing", name: "Color Separation Spectral", formula: "C_i = S × R_i × DeltaLambda × n", variables: { Ci: { name: "Channel energy", unit: "arb", default: 24 }, S: { name: "Illumination spectral density", unit: "arb/nm", default: 2 }, Ri: { name: "Channel spectral response", unit: "ratio", default: 0.6 }, DeltaLambda: { name: "Band spacing", unit: "nm", default: 10 }, n: { name: "Bands integrated", unit: "count", default: 2 } }, solveFor: "Ci", description: "Compact discrete approximation for spectral channel accumulation in color separation.", domain: "Image / Signal Processing", tags: ["spectral", "color", "separation"], compute: v => v.S * v.Ri * v.DeltaLambda * v.n }
+    ];
+
+    const nassengerWorkers = [
+      { id: 1, name: "Unwinder", summary: "Unwind roll into the machine with controlled entry tension.", chain: ["Unwind roll", "brake motor", "dancer roller", "tension sensor", "fabric feed into machine"], tags: ["entry", "tension", "fabric"] },
+      { id: 2, name: "Fabric feed / advance", summary: "Steps the fabric forward between print passes.", chain: ["Stepper/servo motor", "drive roller", "pinch roller", "encoder", "fabric steps forward between passes"], tags: ["feed", "motion", "encoder"] },
+      { id: 3, name: "Fabric tensioning", summary: "Closes the loop on tension and trims feed correction.", chain: ["Dancer roller", "spring/pneumatic actuator", "tension feedback sensor", "PID", "feed motor correction"], tags: ["feedback", "tension", "pid"] },
+      { id: 4, name: "Fabric flattening / spreading", summary: "Keeps the fabric flat and presented correctly below the print system.", chain: ["Spreader bar", "edge guides", "anti-curl rollers", "ensures flat presentation under heads"], tags: ["flatness", "guiding", "surface"] },
+      { id: 5, name: "Carriage scanning (X axis)", summary: "Moves the print carriage across the fabric width.", chain: ["DC servo motor", "timing belt", "carriage rail", "linear encoder strip", "printhead bar riding across fabric width"], tags: ["x-axis", "carriage", "servo"] },
+      { id: 6, name: "Printhead array", summary: "Deposits droplets onto fabric through the full head bank.", chain: ["Ink manifold", "32 KM1024 heads", "piezo actuators", "32,768 nozzles firing drops onto fabric"], tags: ["print", "heads", "inkjet"] },
+      { id: 7, name: "Ink supply per color channel (×8)", summary: "Runs eight parallel mini-workers feeding each color path.", chain: ["Main ink tank", "peristaltic pump", "filter", "sub-tank on carriage", "damper", "each printhead color inlet"], tags: ["8 parallel", "ink supply", "color channels"] },
+      { id: 8, name: "Nozzle health monitor", summary: "Tracks live nozzle condition and generates compensation flags.", chain: ["Optical drop detector", "camera sensor", "nozzle map", "RIP compensation signal", "flags dead nozzles live"], tags: ["inspection", "nozzles", "monitoring"] },
+      { id: 9, name: "Head height adjustment", summary: "Sets the print gap for different fabric thicknesses.", chain: ["Stepper motor", "lead screw", "carriage vertical axis", "sets gap between nozzle plate and fabric surface (handles 0-15mm thickness)"], tags: ["z-axis", "gap", "height"] },
+      { id: 10, name: "Maintenance / capping station", summary: "Parks, wipes, caps, and purges the carriage during maintenance cycles.", chain: ["Carriage parks", "cap seals nozzle face", "wiper blade wipes", "suction pump purges", "carriage returns"], tags: ["service", "capping", "purge"] },
+      { id: 11, name: "RIP / image processing engine", summary: "Builds synchronized firing data from image inputs and compensation masks.", chain: ["CPU/FPGA", "ICC color profile", "halftoning", "8-channel separation", "dead nozzle mask", "firing bitmap", "sent to heads in sync with encoder pulses"], tags: ["rip", "image", "synchronization"] },
+      { id: 12, name: "Dryer", summary: "Removes moisture after deposition in the drying zone.", chain: ["3-phase heating elements", "hot air blower", "air knife", "fabric passes through", "moisture evaporated"], tags: ["drying", "thermal", "airflow"] },
+      { id: 13, name: "Rewinder / winder", summary: "Collects printed fabric with torque compensation as the roll grows.", chain: ["Servo motor", "torque control", "growing roll radius compensation", "dancer roller", "winds printed fabric"], tags: ["rewind", "torque", "roll growth"] },
+      { id: 14, name: "Belt washing unit (if belt conveyor equipped)", summary: "Continuously cleans the adhesive belt when conveyor mode is present.", chain: ["Water spray nozzles", "rotating brush", "air blade dryer", "cleans adhesive belt continuously"], tags: ["belt", "washing", "cleaning"] },
+      { id: 15, name: "Environmental control sensing", summary: "Monitors temperature and humidity operating limits for print stability.", chain: ["Temperature sensor", "humidity sensor", "RH/temp feedback", "alerts operator if outside 15-30C / 40-70% RH band"], tags: ["environment", "alerts", "sensing"] },
+      { id: 16, name: "Central control / touch panel", summary: "Supervises jobs, modes, and worker loop coordination.", chain: ["Touch UI", "WYSIWYG RIP", "job queue", "mode selector", "all worker PID loops supervised from here"], tags: ["control", "ui", "supervision"] }
+    ];
+
+    const twinZones = [
+      { label: "Feeder", left: "4%", top: "12%", width: "22%", height: "70%" },
+      { label: "Printer", left: "28%", top: "8%", width: "40%", height: "76%" },
+      { label: "Dryer", left: "70%", top: "12%", width: "20%", height: "70%" }
+    ];
+
+    const els = {
+      workspace: document.querySelector(".workspace"),
+      tabbar: document.getElementById("tabbar"),
+      themeToggle: document.getElementById("themeToggle"),
+      sidebarToggle: document.getElementById("sidebarToggle"),
+      categoryList: document.getElementById("category-list"),
+      cardGrid: document.getElementById("card-grid"),
+      searchInput: document.getElementById("search-input"),
+      resultCount: document.getElementById("result-count"),
+      inspectorModal: document.getElementById("inspector-modal"),
+      inspectorClose: document.getElementById("inspector-close"),
+      inspectorTitle: document.getElementById("inspector-title"),
+      inspectorDescription: document.getElementById("inspector-description"),
+      inspectorBody: document.getElementById("inspector-body"),
+      statFormulas: document.getElementById("stat-formulas"),
+      statCategories: document.getElementById("stat-categories"),
+      workersGrid: document.getElementById("workers-grid")
+    };
+
+    const formulaState = {
+      selectedCategory: "All",
+      search: "",
+      selectedId: formulas[0].id
+    };
+
+    const uiState = {
+      darkTheme: false,
+      sidebarCollapsed: false,
+      selectedWorkerId: null,
+      inspectorOpen: false
+    };
+
+
+    function switchSection(sectionId) {
+      document.querySelectorAll(".tab-button").forEach(button => {
+        button.classList.toggle("active", button.dataset.section === sectionId);
+      });
+      document.querySelectorAll(".app-section").forEach(section => {
+        section.classList.toggle("active", section.id === sectionId);
+      });
+    }
+
+    function syncUiState() {
+      document.body.classList.toggle("theme-dark", uiState.darkTheme);
+      els.workspace.classList.toggle("sidebar-collapsed", uiState.sidebarCollapsed);
+      els.inspectorModal.classList.toggle("open", uiState.inspectorOpen);
+      els.inspectorModal.setAttribute("aria-hidden", String(!uiState.inspectorOpen));
+      const themeLabel = uiState.darkTheme ? "Light theme" : "Dark theme";
+      const sidebarLabel = uiState.sidebarCollapsed ? "Expand" : "Collapse";
+      els.themeToggle.querySelector(".action-label").textContent = themeLabel;
+      els.sidebarToggle.querySelector(".action-label").textContent = sidebarLabel;
+      els.sidebarToggle.setAttribute("aria-pressed", String(uiState.sidebarCollapsed));
+      els.themeToggle.setAttribute("aria-pressed", String(uiState.darkTheme));
+      els.themeToggle.setAttribute("title", themeLabel);
+      els.sidebarToggle.setAttribute("title", sidebarLabel);
+      window.dispatchEvent(new CustomEvent("faulter:ui-state", { detail: { ...uiState } }));
+    }
+
+    function getCategories() {
+      const counts = formulas.reduce((acc, formula) => {
+        acc[formula.category] = (acc[formula.category] || 0) + 1;
+        return acc;
+      }, {});
+      return [{ name: "All", count: formulas.length }].concat(
+        Object.entries(counts).map(([name, count]) => ({ name, count }))
+      );
+    }
+
+    function filterFormulas() {
+      const search = formulaState.search.trim().toLowerCase();
+      return formulas.filter(formula => {
+        const categoryMatch = formulaState.selectedCategory === "All" || formula.category === formulaState.selectedCategory;
+        if (!categoryMatch) return false;
+        if (!search) return true;
+        const variableText = Object.entries(formula.variables).map(([key, value]) => `${key} ${value.name} ${value.unit}`).join(" ");
+        const haystack = [formula.id, formula.name, formula.formula, formula.description, formula.domain, formula.category, formula.tags.join(" "), variableText].join(" ").toLowerCase();
+        return haystack.includes(search);
+      });
+    }
+
+    function formatValue(value) {
+      if (!Number.isFinite(value)) return "Calculation error";
+      const abs = Math.abs(value);
+      if (abs >= 1e6 || (abs > 0 && abs < 1e-3)) return value.toExponential(4);
+      return Number(value.toFixed(4)).toString();
+    }
+
+    function escapeHtml(value) {
+      return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    function getFormulaById(id) {
+      return formulas.find(formula => formula.id === id) || formulas[0];
+    }
+
+    function renderFormulaCategories() {
+      const categories = getCategories();
+      els.statFormulas.textContent = formulas.length;
+      els.statCategories.textContent = categories.length - 1;
+      els.categoryList.innerHTML = categories.map(category => `
+        <button class="category-button ${formulaState.selectedCategory === category.name ? "active" : ""}" data-category="${category.name}">
+          <span>${category.name}</span>
+          <span>${category.count}</span>
+        </button>
+      `).join("");
+      els.categoryList.querySelectorAll(".category-button").forEach(button => {
+        button.addEventListener("click", () => {
+          formulaState.selectedCategory = button.dataset.category;
+          renderFormulaDeck();
+        });
+      });
+    }
+
+    function renderFormulaCards() {
+      const filtered = filterFormulas();
+      els.resultCount.textContent = `${filtered.length} formula${filtered.length === 1 ? "" : "s"} visible`;
+      if (!filtered.some(item => item.id === formulaState.selectedId)) {
+        formulaState.selectedId = filtered[0] ? filtered[0].id : formulas[0].id;
+      }
+      if (!filtered.length) {
+        els.cardGrid.innerHTML = `<div class="empty-state">No formulas match this filter. Try a broader search or change categories.</div>`;
+        return;
+      }
+      els.cardGrid.innerHTML = filtered.map(formula => `
+        <article class="card ${formulaState.selectedId === formula.id ? "active" : ""}" data-id="${formula.id}">
+          <div class="card-top">
+            <span class="chip">${formula.id}</span>
+            <span class="tag">${formula.category}</span>
+          </div>
+          <div>
+            <h3>${formula.name}</h3>
+            <div class="formula-text">${formula.formula}</div>
+          </div>
+          <p class="description">${formula.description}</p>
+          <div class="tag-row">${formula.tags.slice(0, 3).map(tag => `<span class="tag">${tag}</span>`).join("")}</div>
+          <button class="inspect-button" type="button" data-inspect-id="${formula.id}">Open Inspector</button>
+        </article>
+      `).join("");
+      els.cardGrid.querySelectorAll(".card").forEach(card => {
+        card.addEventListener("click", () => {
+          formulaState.selectedId = card.dataset.id;
+          renderFormulaCards();
+        });
+      });
+      els.cardGrid.querySelectorAll(".inspect-button").forEach(button => {
+        button.addEventListener("click", event => {
+          event.stopPropagation();
+          formulaState.selectedId = button.dataset.inspectId;
+          uiState.inspectorOpen = true;
+          renderFormulaCards();
+          renderFormulaInspector();
+          syncUiState();
+        });
+      });
+    }
+
+    function renderFormulaInspector() {
+      const formula = getFormulaById(formulaState.selectedId);
+      const values = Object.fromEntries(Object.entries(formula.variables).map(([key, meta]) => [key, meta.default]));
+      const solveMeta = formula.variables[formula.solveFor] || { unit: "" };
+      els.inspectorTitle.textContent = formula.name;
+      els.inspectorDescription.textContent = formula.description;
+      els.inspectorBody.innerHTML = `
+        <div class="hero-formula">${formula.formula}</div>
+        <div class="detail-grid">
+          <div class="detail"><label>Category</label><strong>${formula.category}</strong></div>
+          <div class="detail"><label>Solve For</label><strong>${formula.solveFor} ${solveMeta.unit ? `(${solveMeta.unit})` : ""}</strong></div>
+          <div class="detail"><label>Domain</label><strong>${formula.domain}</strong></div>
+          <div class="detail"><label>Tags</label><strong>${formula.tags.join(", ")}</strong></div>
+        </div>
+        <div class="section-label">Variables</div>
+        <div class="variables">
+          ${Object.entries(formula.variables).map(([key, meta]) => `
+            <div class="var-row">
+              <div class="var-copy">
+                <strong>${key}: ${meta.name}</strong>
+                <div class="var-meta">${meta.unit}</div>
+              </div>
+              <div class="var-input">
+                <input type="number" step="any" data-key="${key}" value="${meta.default}">
+              </div>
+            </div>
+          `).join("")}
+        </div>
+        <div class="result-box">
+          <label>Live Result</label>
+          <div id="result-value" class="result-value">${formula.solveFor} = ${formatValue(formula.compute(values))} ${solveMeta.unit || ""}</div>
+          <div class="result-help">This widget solves the formula's default target with the values currently shown.</div>
+        </div>
+        <div class="section-label">JSON Preview</div>
+        <pre class="json-preview">${escapeHtml(JSON.stringify(formula, (key, value) => typeof value === "function" ? "[function]" : value, 2))}</pre>
+      `;
+      const inputs = els.inspectorBody.querySelectorAll("input[data-key]");
+      const resultNode = els.inspectorBody.querySelector("#result-value");
+      function updateResult() {
+        const current = {};
+        inputs.forEach(input => {
+          current[input.dataset.key] = Number(input.value);
+        });
+        resultNode.textContent = `${formula.solveFor} = ${formatValue(formula.compute(current))} ${solveMeta.unit || ""}`;
+      }
+      inputs.forEach(input => input.addEventListener("input", updateResult));
+    }
+
+    function renderFormulaDeck() {
+      renderFormulaCategories();
+      renderFormulaCards();
+      renderFormulaInspector();
+    }
+
+    function renderWorkers() {
+      els.workersGrid.innerHTML = nassengerWorkers.map(worker => `
+        <article class="worker-card ${uiState.selectedWorkerId === worker.id ? "active" : ""}" data-worker-id="${worker.id}" tabindex="0" role="button" aria-pressed="${uiState.selectedWorkerId === worker.id}">
+          <div class="worker-top">
+            <span class="chip">Worker ${worker.id}</span>
+            <div class="worker-tags">${worker.tags.map(tag => `<span class="worker-chip">${tag}</span>`).join("")}</div>
+          </div>
+          <div class="worker-title">
+            <h3>${worker.name}</h3>
+            <p class="worker-sub">${worker.summary}</p>
+          </div>
+          <div class="worker-status">${uiState.selectedWorkerId === worker.id ? "Selected" : "Clickable block"}</div>
+          <div class="worker-chain">
+            ${worker.chain.map((step, index) => `
+              <span class="chain-node">${step}</span>${index < worker.chain.length - 1 ? '<span class="chain-arrow">→</span>' : ""}
+            `).join("")}
+          </div>
+        </article>
+      `).join("");
+
+      els.workersGrid.querySelectorAll(".worker-card").forEach(card => {
+        const selectWorker = () => {
+          uiState.selectedWorkerId = Number(card.dataset.workerId);
+          renderWorkers();
+        };
+        card.addEventListener("click", selectWorker);
+        card.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            selectWorker();
+          }
+        });
+      });
+    }
+
+    function getWorkerById(id) {
+      return nassengerWorkers.find(worker => worker.id === id) || nassengerWorkers[0];
+    }
+
+    function getTwinWorkerByComponentId(componentId) {
+      return twinWorkers.find(worker => worker.components.some(component => component.id === componentId)) || twinWorkers[0];
+    }
+
+    function getTwinComponentById(componentId) {
+      for (const worker of twinWorkers) {
+        const component = worker.components.find(entry => entry.id === componentId);
+        if (component) return component;
+      }
+      return twinWorkers[0].components[0];
+    }
+
+    function getFormulaByEntryId(formulaId) {
+      return formulas.find(formula => formula.id === formulaId) || formulas[0];
+    }
+
+    function getDomainClass(domain) {
+      const map = {
+        electrical: "domain-electrical",
+        mechanical: "domain-mechanical",
+        thermal: "domain-thermal",
+        fluid: "domain-fluid",
+        control: "domain-control"
+      };
+      return map[domain] || "domain-control";
+    }
+
+    function getDomainName(domain) {
+      const map = {
+        electrical: "Electrical",
+        mechanical: "Mechanical",
+        thermal: "Thermal",
+        fluid: "Fluid",
+        control: "Control"
+      };
+      return map[domain] || "Control";
+    }
+
+    function getComponentState(component) {
+      if (!component.currentValues) {
+        component.currentValues = JSON.parse(JSON.stringify(component.variables));
+      }
+      return component.currentValues;
+    }
+
+    function getComponentDisplayValue(component) {
+      const formula = getFormulaByEntryId(component.formulaId);
+      const current = getComponentState(component);
+      const value = component.displayKey === formula.solveFor ? formula.compute(current) : current[component.displayKey];
+      const unit = formula.variables[component.displayKey]?.unit || formula.variables[formula.solveFor]?.unit || "";
+      return `${formatValue(value)} ${unit}`.trim();
+    }
+
+    function runTwinSimulation() {
+      const time = Date.now() / 1000;
+      twinWorkers.forEach(worker => {
+        worker.components.forEach(component => {
+          const current = getComponentState(component);
+          Object.entries(component.simulation || {}).forEach(([key, config]) => {
+            const [min, max, phase, speed] = config;
+            const mid = (min + max) / 2;
+            const amp = (max - min) / 2;
+            current[key] = mid + amp * Math.sin(time * speed + phase);
+          });
+        });
+      });
+      if (uiState.twinOpen) {
+        renderTwin();
+      }
+    }
+
+    function renderTwinDetail() {
+      const component = getTwinComponentById(uiState.selectedTwinComponentId);
+      const worker = getTwinWorkerByComponentId(component.id);
+      const formula = getFormulaByEntryId(component.formulaId);
+      const current = getComponentState(component);
+      const solveMeta = formula.variables[formula.solveFor] || { unit: "" };
+      const result = formula.compute(current);
+
+      els.twinDetail.innerHTML = `
+        <span class="chip">${worker.name}</span>
+        <h3>${component.name}</h3>
+        <p class="description">${getDomainName(component.domain)} component in ${worker.name}. Governing formula is scoped to this node only.</p>
+        <div class="twin-mini-grid">
+          <div class="detail">
+            <label>Domain</label>
+            <strong>${getDomainName(component.domain)}</strong>
+          </div>
+          <div class="detail">
+            <label>Worker</label>
+            <strong>W${worker.workerId}</strong>
+          </div>
+        </div>
+        <div class="detail">
+          <label>Governing Formula</label>
+          <strong>${formula.name}</strong>
+          <div class="description" style="margin-top:8px;">${formula.formula}</div>
+        </div>
+        <div class="section-label">Current Parameters</div>
+        <div class="solver-grid">
+          ${Object.entries(formula.variables).map(([key, meta]) => `
+            <div class="solver-row">
+              <div class="solver-meta">
+                <div class="solver-name">${key}: ${meta.name}</div>
+                <div class="solver-unit">${meta.unit}</div>
+              </div>
+              <input type="number" step="any" data-component-input="${key}" value="${current[key]}">
+            </div>
+          `).join("")}
+        </div>
+        <button id="solveComponentButton" class="solve-button" type="button">Solve</button>
+        <div class="solver-result">
+          <label style="display:block; opacity:0.7; font-size:12px; letter-spacing:0.14em; text-transform:uppercase; margin-bottom:8px;">Result</label>
+          <div id="componentResultValue" style="font-size:28px; font-weight:800;">${formula.solveFor} = ${formatValue(result)} ${solveMeta.unit || ""}</div>
+        </div>
+      `;
+
+      const inputs = els.twinDetail.querySelectorAll("input[data-component-input]");
+      const resultNode = els.twinDetail.querySelector("#componentResultValue");
+      const solveButton = els.twinDetail.querySelector("#solveComponentButton");
+
+      inputs.forEach(input => {
+        input.addEventListener("input", () => {
+          current[input.dataset.componentInput] = Number(input.value);
+        });
+      });
+
+      solveButton.addEventListener("click", () => {
+        const solved = formula.compute(current);
+        resultNode.textContent = `${formula.solveFor} = ${formatValue(solved)} ${solveMeta.unit || ""}`;
+        renderTwin();
+      });
+    }
+
+    function renderTwin() {
+      const stageHeight = 860;
+      const riverCenter = 420;
+      const topStart = 90;
+      const bottomStart = 505;
+      const stepY = 84;
+
+      const chainMarkup = twinWorkers.map(worker => {
+        const labelTop = worker.placement === "above" ? topStart - 44 : riverCenter + 95;
+        const touchTop = worker.placement === "above" ? riverCenter - 10 : riverCenter + 76;
+        let markup = `<div class="twin-worker-label" style="left:${worker.x}%; top:${labelTop}px;">${worker.name}</div>`;
+        const reversed = worker.placement === "below";
+        const components = reversed ? [...worker.components].reverse() : worker.components;
+        const baseTop = reversed ? bottomStart : topStart;
+
+        components.forEach((component, index) => {
+          const top = baseTop + index * stepY;
+          const isActive = uiState.selectedTwinComponentId === component.id;
+          const currentValue = getComponentDisplayValue(component);
+          markup += `
+            <button class="twin-node ${getDomainClass(component.domain)} ${isActive ? "active" : ""}" type="button" data-component-id="${component.id}" style="left:calc(${worker.x}% - 69px); top:${top}px;">
+              <div class="twin-node-name">
+                <span class="domain-pill ${getDomainClass(component.domain)}">${component.icon}</span>
+                <span class="twin-node-title">${component.name}</span>
+              </div>
+              <div class="twin-node-meta">${currentValue}</div>
+            </button>
+          `;
+          if (index < components.length - 1) {
+            markup += `<div class="twin-link" style="left:${worker.x}%; top:${top + 52}px; height:${stepY - 16}px;"></div>`;
+          } else {
+            const lineTop = worker.placement === "above" ? top + 52 : riverCenter + 12;
+            const height = worker.placement === "above" ? touchTop - (top + 52) : top - (riverCenter + 8);
+            markup += `<div class="twin-link" style="left:${worker.x}%; top:${lineTop}px; height:${Math.max(height, 18)}px;"></div>`;
+          }
+        });
+
+        markup += `<div class="twin-chain-touch" style="left:${worker.x}%; top:${touchTop}px;"></div>`;
+        return markup;
+      }).join("");
+
+      els.twinStage.innerHTML = `
+        ${twinZones.map(zone => `<div class="twin-zone" style="left:${zone.left}; top:${zone.top}; width:${zone.width}; height:${zone.height};"><span class="zone-label">${zone.label}</span></div>`).join("")}
+        <div class="twin-river"></div>
+        <div class="twin-river-label">Textile River</div>
+        ${chainMarkup}
+      `;
+
+      els.twinStage.querySelectorAll(".twin-node").forEach(node => {
+        node.addEventListener("click", () => {
+          uiState.selectedTwinComponentId = node.dataset.componentId;
+          renderTwin();
+        });
+      });
+
+      renderTwinDetail();
+    }
+
+    els.tabbar.querySelectorAll(".tab-button").forEach(button => {
+      button.addEventListener("click", () => switchSection(button.dataset.section));
+    });
+
+    els.themeToggle.addEventListener("click", () => {
+      uiState.darkTheme = !uiState.darkTheme;
+      syncUiState();
+    });
+
+    els.sidebarToggle.addEventListener("click", () => {
+      uiState.sidebarCollapsed = !uiState.sidebarCollapsed;
+      syncUiState();
+    });
+
+    els.searchInput.addEventListener("input", event => {
+      formulaState.search = event.target.value;
+      renderFormulaCards();
+    });
+
+    els.inspectorClose.addEventListener("click", () => {
+      uiState.inspectorOpen = false;
+      syncUiState();
+    });
+
+    els.inspectorModal.addEventListener("click", event => {
+      if (event.target === els.inspectorModal) {
+        uiState.inspectorOpen = false;
+        syncUiState();
+      }
+    });
+
+    document.addEventListener("keydown", event => {
+      if (event.key === "Escape" && uiState.inspectorOpen) {
+        uiState.inspectorOpen = false;
+        syncUiState();
+      }
+    });
+
+    syncUiState();
+    renderFormulaDeck();
+    renderWorkers();
+
+    window.FAULTER_DATA = {
+      formulas,
+      nassengerWorkers
+    };
+
+    window.FAULTER_UTILS = {
+      formatValue
+    };
+
+    window.FAULTER_UI = uiState;
+    window.dispatchEvent(new CustomEvent("faulter:data-ready"));
+  </script>
+</body>
+</html>

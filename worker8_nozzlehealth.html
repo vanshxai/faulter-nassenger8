@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nassenger 8 Digital Twin - Worker 8: Nozzle Health Monitor</title>
+<style>
+:root {
+  --bg: #f5f5f5; --bg2: #ffffff; --bg3: #e8e8e8; --text: #222; --text2: #555;
+  --border: #ccc; --accent: #378ADD; --accent2: #BA7517; --accent3: #D85A30; --accent4: #1D9E75;
+  --card-bg: #fff; --shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+[data-theme="dark"] {
+  --bg: #1a1a2e; --bg2: #16213e; --bg3: #0f3460; --text: #eee; --text2: #aaa;
+  --border: #444; --card-bg: #16213e; --shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+.topbar { display: flex; align-items: center; gap: 12px; padding: 8px 16px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.topbar h1 { font-size: 16px; margin-right: auto; }
+.btn { padding: 6px 14px; border: 1px solid var(--border); background: var(--bg3); color: var(--text); border-radius: 4px; cursor: pointer; font-size: 13px; }
+.btn:hover { background: var(--accent); color: #fff; }
+.speed-ctrl { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+.speed-ctrl input { width: 80px; }
+.layout { display: grid; grid-template-columns: 220px 1fr 260px; gap: 8px; padding: 8px; height: calc(100vh - 48px); }
+.left-panel, .right-panel { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; }
+.center-panel { display: flex; flex-direction: column; gap: 8px; }
+.card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; box-shadow: var(--shadow); }
+.card h3 { font-size: 13px; margin-bottom: 6px; color: var(--text2); }
+.slider-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 12px; }
+.slider-row label { flex: 1; }
+.slider-row input[type=range] { flex: 2; margin: 0 6px; }
+.slider-row .val { width: 50px; text-align: right; font-family: monospace; }
+.svg-container { flex: 1; min-height: 200px; }
+.svg-container svg { width: 100%; height: 100%; }
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.chart-box { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; padding: 6px; }
+.chart-box h4 { font-size: 11px; margin-bottom: 4px; color: var(--text2); }
+.chart-box canvas { width: 100%; height: 100px; display: block; }
+.formula-chain { font-size: 11px; font-family: monospace; background: var(--bg3); padding: 6px; border-radius: 4px; line-height: 1.6; }
+.formula-chain .step { color: var(--accent); font-weight: bold; }
+.state-card { font-size: 12px; }
+.state-row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid var(--border); }
+.state-row:last-child { border: none; }
+.state-label { color: var(--text2); }
+.state-value { font-family: monospace; font-weight: bold; }
+.sparkline { width: 100%; height: 30px; }
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Nassenger 8 - Worker 8: Nozzle Health Monitor</h1>
+  <button class="btn" id="playBtn">Play</button>
+  <button class="btn" id="pauseBtn">Pause</button>
+  <button class="btn" id="resetBtn">Reset</button>
+  <div class="speed-ctrl">
+    <label>Speed:</label>
+    <input type="range" id="speedSlider" min="1" max="20" value="5">
+    <span id="speedVal">5x</span>
+  </div>
+  <button class="btn" id="themeBtn">Dark</button>
+</div>
+<div class="layout">
+  <div class="left-panel">
+    <div class="card">
+      <h3>Parameters</h3>
+      <div id="sliders"></div>
+    </div>
+    <div class="card">
+      <h3>Formula Chain (8 steps)</h3>
+      <div class="formula-chain" id="formulas"></div>
+    </div>
+  </div>
+  <div class="center-panel">
+    <div class="card svg-container" id="svgContainer"></div>
+    <div class="charts-grid">
+      <div class="chart-box"><h4>Nozzle Health %</h4><canvas id="chart0"></canvas></div>
+      <div class="chart-box"><h4>Dead Nozzle Count</h4><canvas id="chart1"></canvas></div>
+      <div class="chart-box"><h4>Optical Signal</h4><canvas id="chart2"></canvas></div>
+      <div class="chart-box"><h4>Health Trend</h4><canvas id="chart3"></canvas></div>
+    </div>
+  </div>
+  <div class="right-panel">
+    <div class="card state-card"><h3>State Variables</h3><div id="stateVars"></div></div>
+    <div class="card state-card"><h4>Nozzle Map Summary</h4><div id="nozzleSummary"></div></div>
+    <div class="card state-card"><h3>Classification</h3><div id="classification"></div></div>
+  </div>
+</div>
+
+<script>
+const DT = 0.01;
+const HIST_LEN = 300;
+const SPARK_LEN = 50;
+const TOTAL_NOZZLES = 1024;
+const GRID_ROWS = 32;
+const GRID_COLS = 32;
+
+const PARAM_DEFS = [
+  { id: 'optical_intensity', label: 'Optical Intensity (I0)', min: 50, max: 1000, val: 500 },
+  { id: 'absorption_coeff', label: 'Absorption Coeff', min: 0.001, max: 0.1, val: 0.02, step: 0.001 },
+  { id: 'camera_resolution', label: 'Camera Resolution', min: 64, max: 2048, val: 512, step: 64 },
+  { id: 'dead_threshold', label: 'Dead Threshold', min: 0.01, max: 0.5, val: 0.15, step: 0.01 },
+  { id: 'weak_threshold', label: 'Weak Threshold', min: 0.1, max: 0.8, val: 0.4, step: 0.05 },
+  { id: 'scan_rate', label: 'Scan Rate (Hz)', min: 1, max: 100, val: 30 },
+  { id: 'degradation_rate', label: 'Degradation Rate', min: 0.0001, max: 0.01, val: 0.002, step: 0.0001 },
+  { id: 'compensation_factor', label: 'Compensation Factor', min: 0.5, max: 3, val: 1.5, step: 0.1 }
+];
+
+let params = {};
+PARAM_DEFS.forEach(p => params[p.id] = p.val);
+
+let state = {
+  I_env: 0, delta_I: 0, fault_stall: false, fault_overcurrent: false,
+  signal: 0.8, contrast: 0.6, dead_count: 0, weak_count: 0,
+  health_pct: 100, compensation_count: 0, failure_rate: 0, trend: 0,
+  nozzle_map: new Array(TOTAL_NOZZLES).fill('OK'),
+  history: { health_pct: [], dead_count: [], signal: [], trend: [] },
+  sparklines: { health_pct: [], dead_count: [], signal: [], trend: [] }
+};
+
+let running = false, speed = 5, simTime = 0;
+
+const WORKER_CODE = `
+const DT = 0.01;
+const TOTAL_NOZZLES = 1024;
+function compute(p, st, dt) {
+  let I0 = p.optical_intensity;
+  let alpha = p.absorption_coeff;
+  let c = 0.5 + Math.random() * 0.3;
+  let L = 1;
+  let signal = I0 * Math.exp(-alpha * c * L) / I0;
+  let I_max = I0 * (1 + Math.random() * 0.1);
+  let I_min = I0 * 0.3 * (1 + Math.random() * 0.1);
+  let contrast = (I_max - I_min) / (I_max + I_min);
+  let dead_t = p.dead_threshold;
+  let weak_t = p.weak_threshold;
+  let new_map = [...st.nozzle_map];
+  let ok_count = 0, weak_c = 0, dead_c = 0, sat_c = 0;
+  for (let i = 0; i < TOTAL_NOZZLES; i++) {
+    let r = Math.random();
+    let degradation = st.simTime * p.degradation_rate;
+    let s = signal - degradation + (Math.random() - 0.5) * 0.05;
+    if (s < dead_t) { new_map[i] = 'dead'; dead_c++; }
+    else if (s < weak_t) { new_map[i] = 'weak'; weak_c++; }
+    else if (r < 0.01) { new_map[i] = 'satellite'; sat_c++; }
+    else { new_map[i] = 'OK'; ok_count++; }
+  }
+  let health_pct = (ok_count / TOTAL_NOZZLES) * 100;
+  let comp_count = Math.min(dead_c * Math.floor(p.compensation_factor), ok_count);
+  let bitmap_adjust = dead_c * p.compensation_factor;
+  let failure_rate = dead_c > 0 ? dead_c / (dt * 60 + 1) : 0;
+  let trend = health_pct - st.health_pct;
+  let prev_health = st.health_pct;
+  
+  // ── LAYER A-E: Energy Chain (Sync) ──
+  let V_bus = p.V_line * 1.35 - (st.I_load || 0) * p.R_bus;
+  let D_pwm = p.V_input ? p.V_input / (p.V_line * 1.35 + 1e-6) : 0.5;
+  let V_back_emf = (p.K_e||0.1) * (st.omega || 0);
+  
+  st.delta_I = (V_bus - V_back_emf) * D_pwm * (1/p.f_sw) / (p.L_motor||0.05);
+  st.I_env = ((p.T_load||10) / ((p.K_t||0.1) * p.efficiency));
+  if (st.fault_stall) st.I_env *= 2.5;
+  if (st.fault_overcurrent) st.I_env *= 1.5;
+
+  return { signal, contrast, dead_count: dead_c, weak_count: weak_c, health_pct, compensation_count: comp_count, failure_rate, trend, nozzle_map: new_map };
+}
+self.onmessage = e => { if (e.data.type === 'step') { let res = compute(e.data.params, e.data.state, DT); self.postMessage({ type: 'result', state: res }); } };
+`;
+
+let workers = [];
+
+document.getElementById('chk_stall')?.addEventListener('change', e => state.fault_stall = e.target.checked);
+document.getElementById('chk_overcurrent')?.addEventListener('change', e => state.fault_overcurrent = e.target.checked);
+
+function initWorkers() {
+  for (let i = 0; i < 4; i++) {
+    const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+    const w = new Worker(URL.createObjectURL(blob));
+    w.onmessage = e => { if (e.data.type === 'result') { updateState(e.data.state); } };
+    workers.push(w);
+  }
+}
+
+function stepSimulation() {
+  let idx = simTime % workers.length;
+  workers[idx].postMessage({ type: 'step', params, state: { ...state, simTime } });
+}
+
+function updateState(newState) {
+  state.signal = newState.signal;
+  state.contrast = newState.contrast;
+  state.dead_count = newState.dead_count;
+  state.weak_count = newState.weak_count;
+  state.health_pct = newState.health_pct;
+  state.compensation_count = newState.compensation_count;
+  state.failure_rate = newState.failure_rate;
+  state.trend = newState.trend;
+  state.nozzle_map = newState.nozzle_map;
+  pushHistory();
+  simTime++;
+  updateUI();
+}
+
+function pushHistory() {
+  history.I_signature.push(state.I_env || 0); if(history.I_signature.length>60) history.I_signature.shift();
+  ['health_pct','dead_count','signal','trend'].forEach(k => {
+    state.history[k].push(state[k]);
+    if (state.history[k].length > HIST_LEN) state.history[k].shift();
+    state.sparklines[k].push(state[k]);
+    if (state.sparklines[k].length > SPARK_LEN) state.sparklines[k].shift();
+  });
+}
+
+function buildSliders() {
+  const cont = document.getElementById('sliders');
+  cont.innerHTML = PARAM_DEFS.map(p => `
+    <div class="slider-row">
+      <label>${p.label}</label>
+      <input type="range" min="${p.min}" max="${p.max}" step="${p.step || 1}" value="${p.val}" data-id="${p.id}">
+      <span class="val" data-val="${p.id}">${p.val}</span>
+    </div>
+  `).join('');
+  cont.querySelectorAll('input').forEach(inp => {
+    inp.addEventListener('input', e => {
+      let id = e.target.dataset.id;
+      let v = parseFloat(e.target.value);
+      params[id] = v;
+      cont.querySelector(`[data-val="${id}"]`).textContent = v.toFixed(id === 'absorption_coeff' || id === 'degradation_rate' ? 4 : id === 'dead_threshold' || id === 'weak_threshold' || id === 'compensation_factor' ? 2 : 0);
+    });
+  });
+}
+
+function buildFormulas() {
+  document.getElementById('formulas').innerHTML = `
+    <span class="step">1.</span> signal = I0 * exp(-a*c*L)<br>
+    <span class="step">2.</span> contrast = (Imax-Imin)/(Imax+Imin)<br>
+    <span class="step">3.</span> status = f(signal, contrast)<br>
+    <span class="step">4.</span> map[i] = status_i<br>
+    <span class="step">5.</span> comp = nearest_neighbor(healthy)<br>
+    <span class="step">6.</span> bitmap_adj = dead * comp_factor<br>
+    <span class="step">7.</span> health% = OK/total*100<br>
+    <span class="step">8.</span> trend = d(health)/dt<br>
+  `;
+}
+
+function drawSVG() {
+  let cellW = 400 / GRID_COLS;
+  let cellH = 200 / GRID_ROWS;
+  let cells = '';
+  for (let i = 0; i < TOTAL_NOZZLES; i++) {
+    let row = Math.floor(i / GRID_COLS);
+    let col = i % GRID_COLS;
+    let status = state.nozzle_map[i];
+    let color = status === 'OK' ? '#1D9E75' : status === 'weak' ? '#BA7517' : status === 'dead' ? '#D85A30' : '#9B59B6';
+    cells += `<rect x="${col * cellW}" y="${row * cellH}" width="${cellW - 0.5}" height="${cellH - 0.5}" fill="${color}" opacity="0.8"/>`;
+  }
+  const svg = `
+  <svg viewBox="0 0 560 260" xmlns="http://www.w3.org/2000/svg">
+    <rect width="560" height="260" fill="${getComputedStyle(document.body).getPropertyValue('--bg2')}"/>
+    <text x="200" y="14" fill="var(--text)" font-size="11">Nozzle Grid (${GRID_COLS}x${GRID_ROWS})</text>
+    <rect x="10" y="22" width="400" height="200" fill="#222" stroke="#555" stroke-width="1"/>
+    ${cells}
+    <rect x="420" y="25" width="120" height="35" rx="4" fill="var(--accent)" opacity="0.3"/>
+    <text x="430" y="47" fill="var(--accent)" font-size="10">CAMERA</text>
+    <rect x="420" y="70" width="120" height="50" rx="4" fill="var(--accent4)" opacity="0.3"/>
+    <text x="430" y="90" fill="var(--accent4)" font-size="9">Health: ${state.health_pct.toFixed(1)}%</text>
+    <text x="430" y="108" fill="var(--accent4)" font-size="9">Trend: ${state.trend.toFixed(3)}</text>
+    <rect x="420" y="130" width="120" height="50" rx="4" fill="var(--accent2)" opacity="0.3"/>
+    <text x="430" y="150" fill="var(--accent2)" font-size="9">Dead: ${state.dead_count}</text>
+    <text x="430" y="168" fill="var(--accent2)" font-size="9">Weak: ${state.weak_count}</text>
+    <rect x="420" y="190" width="120" height="50" rx="4" fill="var(--accent3)" opacity="0.3"/>
+    <text x="430" y="210" fill="var(--accent3)" font-size="9">Signal: ${state.signal.toFixed(3)}</text>
+    <text x="430" y="228" fill="var(--accent3)" font-size="9">Contrast: ${state.contrast.toFixed(3)}</text>
+    <rect x="5" y="228" width="80" height="14" rx="2" fill="#1D9E75"/>
+    <text x="12" y="239" fill="#fff" font-size="8">OK</text>
+    <rect x="90" y="228" width="80" height="14" rx="2" fill="#BA7517"/>
+    <text x="97" y="239" fill="#fff" font-size="8">WEAK</text>
+    <rect x="175" y="228" width="80" height="14" rx="2" fill="#D85A30"/>
+    <text x="182" y="239" fill="#fff" font-size="8">DEAD</text>
+    <rect x="260" y="228" width="80" height="14" rx="2" fill="#9B59B6"/>
+    <text x="267" y="239" fill="#fff" font-size="8">SAT</text>
+  </svg>`;
+  document.getElementById('svgContainer').innerHTML = svg;
+}
+
+
+  const sigCanvas = document.getElementById('chart_signature');
+  if (sigCanvas && typeof drawChart === 'function' && history.I_signature) {
+     drawChart('chart_signature', history.I_signature, '#BA7517');
+     const ct_I_sig = document.getElementById('ct_I_sig');
+     if (ct_I_sig) ct_I_sig.textContent = (state.I_env || 0).toFixed(2) + ' A';
+  }
+
+function drawChart(canvasId, data, color) {
+  const canvas = document.getElementById(canvasId);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const w = canvas.clientWidth;
+  const h = canvas.clientHeight;
+  canvas.width = w * 2;
+  canvas.height = h * 2;
+  ctx.scale(2, 2);
+  ctx.clearRect(0, 0, w, h);
+  if (data.length < 2) return;
+  let min = Math.min(...data);
+  let max = Math.max(...data);
+  let range = max - min || 1;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  data.forEach((v, i) => {
+    let x = (i / (HIST_LEN - 1)) * w;
+    let y = h - ((v - min) / range) * (h - 10) - 5;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.strokeStyle = color;
+  ctx.globalAlpha = 0.1;
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
+}
+
+function updateStateVars() {
+  const vars = [
+    { label: 'signal', value: state.signal.toFixed(4) },
+    { label: 'contrast', value: state.contrast.toFixed(4) },
+    { label: 'dead_count', value: state.dead_count.toString() },
+    { label: 'weak_count', value: state.weak_count.toString() },
+    { label: 'health%', value: state.health_pct.toFixed(2) + '%' },
+    { label: 'comp_count', value: state.compensation_count.toString() },
+    { label: 'failure_rate', value: state.failure_rate.toFixed(4) + '/min' },
+    { label: 'trend', value: (state.trend >= 0 ? '+' : '') + state.trend.toFixed(4) }
+  ];
+  document.getElementById('stateVars').innerHTML = vars.map(v =>
+    `<div class="state-row"><span class="state-label">${v.label}</span><span class="state-value">${v.value}</span></div>`
+  ).join('');
+}
+
+function updateNozzleSummary() {
+  let ok = state.nozzle_map.filter(n => n === 'OK').length;
+  let weak = state.nozzle_map.filter(n => n === 'weak').length;
+  let dead = state.nozzle_map.filter(n => n === 'dead').length;
+  let sat = state.nozzle_map.filter(n => n === 'satellite').length;
+  document.getElementById('nozzleSummary').innerHTML = `
+    <div class="state-row"><span class="state-label">Total</span><span class="state-value">${TOTAL_NOZZLES}</span></div>
+    <div class="state-row"><span class="state-label" style="color:var(--accent4)">OK</span><span class="state-value">${ok}</span></div>
+    <div class="state-row"><span class="state-label" style="color:var(--accent2)">Weak</span><span class="state-value">${weak}</span></div>
+    <div class="state-row"><span class="state-label" style="color:var(--accent3)">Dead</span><span class="state-value">${dead}</span></div>
+    <div class="state-row"><span class="state-label" style="color:#9B59B6">Satellite</span><span class="state-value">${sat}</span></div>
+  `;
+}
+
+function updateClassification() {
+  let healthColor = state.health_pct > 80 ? 'var(--accent4)' : state.health_pct > 50 ? 'var(--accent2)' : 'var(--accent3)';
+  document.getElementById('classification').innerHTML = `
+    <div class="state-row"><span class="state-label">Health</span><span class="state-value" style="color:${healthColor}">${state.health_pct.toFixed(1)}%</span></div>
+    <div class="state-row"><span class="state-label">Weak %</span><span class="state-value">${((state.weak_count / TOTAL_NOZZLES) * 100).toFixed(1)}%</span></div>
+    <div class="state-row"><span class="state-label">Dead %</span><span class="state-value">${((state.dead_count / TOTAL_NOZZLES) * 100).toFixed(1)}%</span></div>
+    <div class="state-row"><span class="state-label">RIP Adjust</span><span class="state-value">${(state.dead_count * params.compensation_factor).toFixed(0)} px</span></div>
+  `;
+}
+
+function updateUI() {
+  drawSVG();
+  drawChart('chart0', state.history.health_pct, '#378ADD');
+  drawChart('chart1', state.history.dead_count, '#BA7517');
+  drawChart('chart2', state.history.signal, '#D85A30');
+  drawChart('chart3', state.history.trend, '#1D9E75');
+  updateStateVars();
+  updateNozzleSummary();
+  updateClassification();
+}
+
+let simInterval = null;
+function startSim() {
+  if (simInterval) return;
+  simInterval = setInterval(() => { for (let i = 0; i < speed; i++) stepSimulation(); }, 100);
+}
+function stopSim() { clearInterval(simInterval); simInterval = null; }
+
+document.getElementById('playBtn').onclick = () => { running = true; startSim(); };
+document.getElementById('pauseBtn').onclick = () => { running = false; stopSim(); };
+document.getElementById('resetBtn').onclick = () => {
+  stopSim(); running = false; simTime = 0;
+  state.signal = 0.8; state.contrast = 0.6; state.dead_count = 0; state.weak_count = 0;
+  state.health_pct = 100; state.compensation_count = 0; state.failure_rate = 0; state.trend = 0;
+  state.nozzle_map = new Array(TOTAL_NOZZLES).fill('OK');
+  state.history = { health_pct: [], dead_count: [], signal: [], trend: [] };
+  state.sparklines = { health_pct: [], dead_count: [], signal: [], trend: [] };
+  updateUI();
+};
+document.getElementById('speedSlider').oninput = e => { speed = parseInt(e.target.value); document.getElementById('speedVal').textContent = speed + 'x'; };
+document.getElementById('themeBtn').onclick = () => {
+  let dark = document.body.getAttribute('data-theme') === 'dark';
+  document.body.setAttribute('data-theme', dark ? '' : 'dark');
+  document.getElementById('themeBtn').textContent = dark ? 'Dark' : 'Light';
+};
+
+buildSliders();
+buildFormulas();
+initWorkers();
+updateUI();
+</script>
+</body>
+</html>

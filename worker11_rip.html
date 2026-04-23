@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker 11 — RIP/Image Processing Engine | Nassenger 8 Digital Twin</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-alt: #f7f8fa;
+  --text: #1a1d23;
+  --text-muted: #6b7280;
+  --border: #e2e5ea;
+  --accent: #378ADD;
+  --accent-soft: rgba(55,138,221,0.1);
+  --green: #1D9E75;
+  --amber: #BA7517;
+  --red: #D85A30;
+  --chart-grid: rgba(0,0,0,0.08);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-alt: #22252f;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border: #2d3040;
+    --accent: #5a9fef;
+    --accent-soft: rgba(90,159,239,0.12);
+    --chart-grid: rgba(255,255,255,0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.3);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar h1 span {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.sim-time {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn:hover { background: var(--surface-alt); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.9; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: var(--red); color: #fff; }
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.speed-group {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.speed-group .btn {
+  border: none;
+  border-radius: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.speed-group .btn + .btn { border-left: 1px solid var(--border); }
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.progress-bar {
+  width: 100px;
+  height: 6px;
+  background: var(--surface-alt);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.main {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  min-height: calc(100vh - 52px);
+  align-items: flex-start;
+}
+
+.col-left, .col-right {
+  flex: 0 0 280px;
+  min-width: 0;
+}
+
+.col-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.card-body { padding: 12px 14px; }
+
+.slider-group { margin-bottom: 10px; }
+.slider-group:last-child { margin-bottom: 0; }
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.slider-label .name { color: var(--text); font-weight: 500; }
+.slider-label .val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.state-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.state-card.ok { border-color: var(--green); }
+.state-card.warn { border-color: var(--amber); background: rgba(186,117,23,0.06); }
+.state-card.crit { border-color: var(--red); background: rgba(216,90,48,0.06); }
+
+.state-card .sc-left { min-width: 0; }
+.state-card .sc-sym {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.state-card .sc-name { font-size: 11px; color: var(--text-muted); }
+.state-card .sc-val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.state-card .sc-unit { font-size: 10px; color: var(--text-muted); margin-left: 2px; font-weight: 400; }
+.state-card .sc-sparkline { width: 64px; height: 32px; flex-shrink: 0; }
+
+.schematic-wrap { padding: 12px; display: flex; justify-content: center; }
+.schematic-wrap svg { max-width: 100%; height: auto; }
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.chart-title {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+.chart-title .ct-value {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chart-canvas-wrap { padding: 6px 8px 8px; position: relative; }
+.chart-canvas-wrap canvas { width: 100%; display: block; }
+
+.parallel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  margin-left: 8px;
+}
+
+.formula-chain-toggle {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.formula-chain-toggle .arrow { transition: transform 0.2s ease; font-size: 10px; }
+.formula-chain-toggle .arrow.open { transform: rotate(90deg); }
+
+.formula-chain-body {
+  display: none;
+  padding: 0 14px 14px;
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", monospace;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.formula-chain-body.open { display: block; }
+
+.formula-step {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.formula-step:last-child { border-bottom: none; }
+
+.formula-step .step-num { font-weight: 700; color: var(--accent); margin-right: 6px; }
+
+.formula-step .step-title {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+}
+
+.formula-step .step-eq { color: var(--accent); font-size: 11px; }
+
+.formula-step .parallel-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.formula-step .sequential-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(55,138,221,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(55,138,221,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media (max-width: 900px) {
+  .main { flex-direction: column; }
+  .col-left, .col-right { flex: none; width: 100%; }
+  .charts-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Worker 11 — RIP/Image Processing Engine<span>Nassenger 8 Digital Twin</span></h1>
+    <div class="sim-time" id="simTime">00:00:00</div>
+    <button class="btn primary" id="btnPlay">▶ Play</button>
+    <button class="btn" id="btnReset">↺ Reset</button>
+    <div class="speed-group">
+      <button class="btn active" data-speed="1">1×</button>
+      <button class="btn" data-speed="5">5×</button>
+      <button class="btn" data-speed="10">10×</button>
+      <button class="btn" data-speed="50">50×</button>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <span>Buffer:</span>
+    <div class="progress-bar"><div class="progress-fill" id="bufProgress"></div></div>
+    <span id="bufPct">0%</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: Parameters -->
+  <div class="col-left">
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Image Geometry</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Width</span><span class="val" id="v_imgW">2048 px</span></div>
+          <input type="range" id="s_imgW" min="256" max="8192" step="64" value="2048">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Height</span><span class="val" id="v_imgH">4096 px</span></div>
+          <input type="range" id="s_imgH" min="256" max="16384" step="64" value="4096">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Input DPI</span><span class="val" id="v_dpi_in">300 dpi</span></div>
+          <input type="range" id="s_dpi_in" min="72" max="1200" step="1" value="300">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Scale Factor</span><span class="val" id="v_scale">1.000</span></div>
+          <input type="range" id="s_scale" min="0.25" max="4.0" step="0.05" value="1.0">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Color & Halftone</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Color Depth</span><span class="val" id="v_bpp">8 bpp</span></div>
+          <input type="range" id="s_bpp" min="1" max="16" step="1" value="8">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Halftone Cells</span><span class="val" id="v_ht_cells">16</span></div>
+          <input type="range" id="s_ht_cells" min="4" max="64" step="1" value="16">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">ICC Error Factor</span><span class="val" id="v_icc_err">0.020</span></div>
+          <input type="range" id="s_icc_err" min="0.001" max="0.1" step="0.001" value="0.02">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Processing</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Processing Clock</span><span class="val" id="v_f_proc">200 MHz</span></div>
+          <input type="range" id="s_f_proc" min="50" max="1000" step="10" value="200">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Parallelism</span><span class="val" id="v_parallel">8</span></div>
+          <input type="range" id="s_parallel" min="1" max="32" step="1" value="8">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Buffer Size</span><span class="val" id="v_buf_max">64 MB</span></div>
+          <input type="range" id="s_buf_max" min="8" max="256" step="1" value="64">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Nozzle Compensation</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Dead Nozzles</span><span class="val" id="v_dead_nz">12</span></div>
+          <input type="range" id="s_dead_nz" min="0" max="200" step="1" value="12">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Frame Rate</span><span class="val" id="v_fps">60 fps</span></div>
+          <input type="range" id="s_fps" min="10" max="240" step="1" value="60">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Visualisation -->
+  <div class="col-center">
+
+    <!-- Schematic -->
+    <div class="card">
+      <div class="card-header">Schematic — Worker 11 RIP/Image Processing Pipeline</div>
+      <div class="schematic-wrap">
+        <svg id="schematic" viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--chart-grid)" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="600" height="240" fill="url(#grid)" opacity="0.4"/>
+
+          <!-- Pipeline blocks -->
+          <rect x="20" y="80" width="70" height="50" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="55" y="102" font-size="8" fill="var(--accent)" text-anchor="middle" font-weight="600">INPUT</text>
+          <text x="55" y="114" font-size="7" fill="var(--text-muted)" text-anchor="middle">RGB Image</text>
+
+          <polygon points="95,105 115,95 115,115" fill="var(--text-muted)" opacity="0.4"/>
+
+          <rect x="120" y="80" width="70" height="50" rx="6" fill="var(--surface-alt)" stroke="var(--green)" stroke-width="2"/>
+          <text x="155" y="102" font-size="8" fill="var(--green)" text-anchor="middle" font-weight="600">ICC</text>
+          <text x="155" y="114" font-size="7" fill="var(--text-muted)" text-anchor="middle">Color Sep</text>
+
+          <polygon points="195,105 215,95 215,115" fill="var(--text-muted)" opacity="0.4"/>
+
+          <rect x="220" y="80" width="70" height="50" rx="6" fill="var(--surface-alt)" stroke="var(--amber)" stroke-width="2"/>
+          <text x="255" y="102" font-size="8" fill="var(--amber)" text-anchor="middle" font-weight="600">HALFTONE</text>
+          <text x="255" y="114" font-size="7" fill="var(--text-muted)" text-anchor="middle">Floyd-Steinberg</text>
+
+          <polygon points="295,105 315,95 315,115" fill="var(--text-muted)" opacity="0.4"/>
+
+          <rect x="320" y="80" width="70" height="50" rx="6" fill="var(--surface-alt)" stroke="var(--red)" stroke-width="2"/>
+          <text x="355" y="102" font-size="8" fill="var(--red)" text-anchor="middle" font-weight="600">COMP</text>
+          <text x="355" y="114" font-size="7" fill="var(--text-muted)" text-anchor="middle">Nozzle Map</text>
+
+          <polygon points="395,105 415,95 415,115" fill="var(--text-muted)" opacity="0.4"/>
+
+          <rect x="420" y="80" width="70" height="50" rx="6" fill="var(--surface-alt)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="455" y="102" font-size="8" fill="var(--accent)" text-anchor="middle" font-weight="600">BITMAP</text>
+          <text x="455" y="114" font-size="7" fill="var(--text-muted)" text-anchor="middle">Firing Data</text>
+
+          <polygon points="495,105 515,95 515,115" fill="var(--text-muted)" opacity="0.4"/>
+
+          <!-- Printhead output -->
+          <rect x="520" y="70" width="60" height="70" rx="4" fill="var(--accent-soft)" stroke="var(--green)" stroke-width="2"/>
+          <text x="550" y="100" font-size="8" fill="var(--green)" text-anchor="middle" font-weight="600">PRINT</text>
+          <text x="550" y="112" font-size="7" fill="var(--text-muted)" text-anchor="middle">HEAD</text>
+
+          <!-- Buffer indicator -->
+          <rect x="220" y="150" width="270" height="16" rx="4" fill="var(--surface-alt)" stroke="var(--border)" stroke-width="1"/>
+          <rect id="sch_buf_bar" x="222" y="152" width="135" height="12" rx="3" fill="var(--green)" opacity="0.7"/>
+          <text x="355" y="185" font-size="8" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Processing Buffer</text>
+          <text id="sch_buf_pct" x="355" y="163" font-size="8" fill="var(--text)" text-anchor="middle" font-weight="700" font-family="SF Mono, Menlo, monospace">50%</text>
+
+          <!-- Data rate indicator -->
+          <text x="300" y="210" font-size="10" fill="var(--text-muted)" text-anchor="middle" font-weight="600">RGB → ICC → Halftone → Compensate → Bitmap → Printhead</text>
+          <text id="sch_dpi_val" x="300" y="230" font-size="9" fill="var(--text)" text-anchor="middle" font-weight="600" font-family="SF Mono, Menlo, monospace"></text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-title">Current Signature i(t) <span class="ct-value" id="ct_I_sig" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_signature" height="130"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Data Throughput <span class="ct-value" id="ct_rate" style="color:#378ADD">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_throughput" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Buffer Fill % <span class="ct-value" id="ct_buf" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_buffer" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Processing Latency <span class="ct-value" id="ct_lat" style="color:#1D9E75">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_latency" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Color Error <span class="ct-value" id="ct_err" style="color:#D85A30">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_colorerr" height="130"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Formula Chain -->
+    <div class="card">
+      <div class="formula-chain-toggle" id="formulaToggle">
+        <span>Formula Chain (8 steps, parallel exec) <span class="parallel-badge">⚡ Parallel</span></span>
+        <span class="arrow" id="formulaArrow">▶</span>
+      </div>
+      <div class="formula-chain-body" id="formulaBody">
+        <div class="formula-step">
+          <span class="step-title">Step 1 — Image Resolution Scaling <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">DPI_out = DPI_in × scale_factor</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 2 — Color Separation (ICC) <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">CMYK = ICC_transform(RGB)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 3 — Halftoning (Floyd-Steinberg) <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">error diffusion to neighbors: e = pixel − quantized</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 4 — Nozzle Compensation Map <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">adjusted_bitmap = compensate(dead_nozzles)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 5 — Firing Bitmap Generation <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">bitmap[i,j] = grayscale_level → pulse_width</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 6 — Data Throughput <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">R_data = W × H × bpp × fps / 8 (bytes/s)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 7 — Buffer Fill Level <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">buffer% = (data_in − data_out) / buffer_max × 100</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 8 — Processing Latency <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">t_proc = (W × H) / (f_proc × parallelism)</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- RIGHT: State Readouts -->
+  <div class="col-right">
+
+    <div class="card" style="margin-top:10px;">
+      <div class="card-header">Energy Fault Injection</div>
+      <div class="card-body" style="padding:10px; display:flex; gap:10px;">
+        <label style="font-size:11px;"><input type="checkbox" id="chk_stall"> Stall (I > 2.5x)</label>
+        <label style="font-size:11px;"><input type="checkbox" id="chk_overcurrent"> Overcurrent (1.5x)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Live State Variables</div>
+      <div class="card-body">
+        <div class="state-grid" id="stateGrid"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const WORKER_CODE = `
+self.onmessage = function(e) {
+  const { id, fn, params } = e.data;
+  let result;
+  const p = params;
+  switch(fn) {
+    case 'power_electronics': // LAYER A
+      result = { V_dc: 1.35 * p.V_line, V_bus: p.V_line * 1.35 - (p.I_load || 0) * p.R_bus, D: p.V_input ? p.V_input / (p.V_line * 1.35 + 1e-6) : 0.5, P_sw: 0.5 * (p.V_line * 1.35) * (p.I_load || 0) * (p.t_r + p.t_f) * p.f_sw, E_gate: 0.5 * p.C_gate * p.V_gs * p.V_gs };
+      break;
+    case 'motor_electrical_adv': // LAYER B
+      result = { delta_I: ((p.V_bus || 600) - (p.K_e||0.1) * (p.omega || 0)) * p.D * (1/p.f_sw) / (p.L_motor||0.05), P_elec: (p.V_input || 0) * (p.I_load || 0), P_cu: (p.I_load || 0) * (p.I_load || 0) * (p.R_motor||0.1), P_fe: p.k_h * p.f_elec * p.B_field * p.B_field + p.k_e * p.f_elec * p.f_elec * p.B_field * p.B_field };
+      break;
+    case 'current_signature': // LAYER C
+      result = { I_env: (p.T_load||10) / ((p.K_t||0.1) * p.efficiency), f_mesh: p.N_teeth * ((p.omega||0) * 60 / (2 * Math.PI)) / 60, f_bpfo: (p.N_balls / 2) * (((p.omega||0) * 60 / (2 * Math.PI)) / 60) * (1 - (p.d_ball / p.D_pitch) * Math.cos(p.alpha_contact)), THD_i: 0.05 };
+      break;
+    case 'mechanical_drive': // LAYER D
+      result = { theta_twist: (p.T_net || 0) * p.L_shaft / (p.G_shear * p.J_polar), delta_belt: (p.F_belt || 0) * p.L_belt / (p.E_belt * p.A_belt), P_gear: (p.T_net || 0) * (p.omega || 0) * (1 - p.eta_gear), T_bearing: (p.mu_b||0.01) * p.F_radial * p.r_bearing, omega_crit: Math.sqrt(p.k_shaft / p.J_shaft) };
+      break;
+    case 'load_energy': // LAYER E
+      result = { E_tension: 0.5 * (p.T_tension || 0)**2 * p.L_span / (p.E_fabric * p.A_fabric), P_nip: (p.F_nip || 0) / (2 * (p.r_roller || 0.1) * (p.w_fabric || 1)), Q_fabric: p.k_fabric * p.A_heat * (p.dT_dx || 0), E_meniscus: Math.PI * p.r_nozzle**2 * p.gamma_ink, E_piezo: 0.5 * p.C_piezo * p.V_drive**2 };
+      break;
+
+    case 'dpi_out':
+      result = p.dpi_in * p.scale;
+      break;
+    case 'color_error':
+      result = p.icc_err * (0.9 + 0.2 * Math.random());
+      break;
+    case 'halftone_error':
+      const cellFactor = p.ht_cells / 16;
+      result = p.base_err * cellFactor * (0.95 + 0.1 * Math.random());
+      break;
+    case 'compensation_count':
+      result = Math.round(p.dead_nozzles * 1.5);
+      break;
+    case 'data_rate':
+      result = (p.W * p.H * p.bpp * p.fps) / 8;
+      break;
+    case 'buffer_pct':
+      result = Math.max(0, Math.min(100, (p.data_in - p.data_out) / p.buf_max * 100));
+      break;
+    case 'latency':
+      result = (p.W * p.H) / (p.f_proc * 1e6 * p.parallel);
+      break;
+    case 'throughput':
+      result = p.data_rate * (1 - p.buffer_pct / 200);
+      break;
+    default:
+      result = NaN;
+  }
+  self.postMessage({ id, result });
+};
+`;
+
+const WORKER_POOL_SIZE = 4;
+const workerPool = [];
+const workerQueue = [];
+let workerIdCounter = 0;
+
+function createWorker() {
+  const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  const worker = new Worker(url);
+  worker.busy = false;
+  worker.pending = null;
+  URL.revokeObjectURL(url);
+  return worker;
+}
+
+function initWorkerPool() {
+  for (let i = 0; i < WORKER_POOL_SIZE; i++) {
+    const w = createWorker();
+    w.onmessage = function(e) {
+      w.busy = false;
+      if (w.pending) {
+        const { resolve } = w.pending;
+        w.pending = null;
+        resolve(e.data.result);
+      }
+      drainWorkerQueue(w);
+    };
+    workerPool.push(w);
+  }
+}
+
+function drainWorkerQueue(worker) {
+  if (workerQueue.length === 0) return;
+  const task = workerQueue.shift();
+  worker.busy = true;
+  worker.postMessage({ id: task.id, fn: task.fn, params: task.params });
+}
+
+function execFormula(fn, params) {
+  return new Promise(resolve => {
+    const idle = workerPool.find(w => !w.busy);
+    if (idle) {
+      idle.busy = true;
+      idle.onmessage = function(e) {
+        idle.busy = false;
+        resolve(e.data.result);
+        drainWorkerQueue(idle);
+      };
+      idle.postMessage({ id: workerIdCounter++, fn, params });
+    } else {
+      workerQueue.push({ id: workerIdCounter++, fn, params, resolve });
+    }
+  });
+}
+
+async function execParallel(formulas) {
+  return Promise.all(formulas.map(f => execFormula(f.fn, f.params)));
+}
+
+const PARAMS = {
+  // LAYER A-E Energy Chain Params
+  D_pwm: 0.5, V_bus_nom: 600, t_r: 1e-7, t_f: 1e-7, f_sw: 10000, C_gate: 1e-9, V_gs: 15, R_bus: 0.1, V_line: 400,
+  k_h: 0.01, k_e: 0.001, B_field: 1.5, f_elec: 50,
+  efficiency: 0.9, N_teeth: 50, N_balls: 8, d_ball: 0.01, D_pitch: 0.05, alpha_contact: 0, I_nominal: 10,
+  L_shaft: 1.0, G_shear: 79e9, J_polar: 1e-4, L_belt: 2.0, E_belt: 1e9, A_belt: 0.001, eta_gear: 0.98, F_radial: 500, r_bearing: 0.02, k_shaft: 1e6, J_shaft: 0.05,
+  L_span: 1.0, k_fabric: 0.5, A_heat: 1.0, gamma_ink: 0.03, r_nozzle: 1e-5, C_piezo: 1e-6, V_drive: 50,
+  imgW: 2048, imgH: 4096, dpi_in: 300, scale: 1.0,
+  bpp: 8, ht_cells: 16, icc_err: 0.02,
+  f_proc: 200, parallel: 8, buf_max: 64,
+  dead_nz: 12, fps: 60,
+  base_ht_err: 0.015,
+};
+
+const state = {
+  I_env: 0, delta_I: 0, fault_stall: false, fault_overcurrent: false,
+  DPI_out: 300, color_error: 0.02, halftone_error: 0.015,
+  compensation_count: 18, data_rate: 0, buffer_pct: 30,
+  latency: 0, throughput: 0,
+  data_in: 0, data_out: 0,
+  tickCount: 0, simTime: 0, running: false, speed: 1,
+};
+
+const DT = 0.01;
+
+const HIST_LEN = 300, SPARK_LEN = 50;
+const hist = { data_rate: [], buffer_pct: [], latency: [], color_error: [] };
+  hist.I_signature = []; spark.I_signature = [];
+const spark = { DPI_out:[], color_error:[], halftone_error:[], compensation_count:[], data_rate:[], buffer_pct:[], latency:[], throughput:[] };
+
+function pushHist(arr, val) { arr.push(val); if (arr.length > HIST_LEN) arr.shift(); }
+function pushSpark(arr, val) { arr.push(val); if (arr.length > SPARK_LEN) arr.shift(); }
+
+const sliderMap = [
+  { id:'s_imgW', key:'imgW', fmt:v=>v.toFixed(0)+' px', d:'v_imgW' },
+  { id:'s_imgH', key:'imgH', fmt:v=>v.toFixed(0)+' px', d:'v_imgH' },
+  { id:'s_dpi_in', key:'dpi_in', fmt:v=>v.toFixed(0)+' dpi', d:'v_dpi_in' },
+  { id:'s_scale', key:'scale', fmt:v=>v.toFixed(3), d:'v_scale' },
+  { id:'s_bpp', key:'bpp', fmt:v=>v.toFixed(0)+' bpp', d:'v_bpp' },
+  { id:'s_ht_cells', key:'ht_cells', fmt:v=>v.toFixed(0), d:'v_ht_cells' },
+  { id:'s_icc_err', key:'icc_err', fmt:v=>v.toFixed(3), d:'v_icc_err' },
+  { id:'s_f_proc', key:'f_proc', fmt:v=>v.toFixed(0)+' MHz', d:'v_f_proc' },
+  { id:'s_parallel', key:'parallel', fmt:v=>v.toFixed(0), d:'v_parallel' },
+  { id:'s_buf_max', key:'buf_max', fmt:v=>v.toFixed(0)+' MB', d:'v_buf_max' },
+  { id:'s_dead_nz', key:'dead_nz', fmt:v=>v.toFixed(0), d:'v_dead_nz' },
+  { id:'s_fps', key:'fps', fmt:v=>v.toFixed(0)+' fps', d:'v_fps' },
+];
+
+sliderMap.forEach(s => {
+  const el = document.getElementById(s.id);
+  const disp = document.getElementById(s.d);
+  el.value = PARAMS[s.key];
+  disp.textContent = s.fmt(PARAMS[s.key]);
+  el.addEventListener('input', () => { PARAMS[s.key] = parseFloat(el.value); disp.textContent = s.fmt(PARAMS[s.key]); });
+});
+
+async function tick() {
+  const p = PARAMS, s = state;
+
+  // Step 1: DPI out
+  const [dpiOut] = await execParallel([
+    { fn: 'dpi_out', params: { dpi_in: p.dpi_in, scale: p.scale } }
+  ]);
+  s.DPI_out = dpiOut;
+
+  // Step 2: Color error (ICC transform noise)
+  const [colorErr] = await execParallel([
+    { fn: 'color_error', params: { icc_err: p.icc_err } }
+  ]);
+  s.color_error = colorErr;
+
+  // Step 3: Halftone error
+  const [htErr] = await execParallel([
+    { fn: 'halftone_error', params: { ht_cells: p.ht_cells, base_err: p.base_ht_err } }
+  ]);
+  s.halftone_error = htErr;
+
+  // Step 4: Compensation count
+  const [compCount] = await execParallel([
+    { fn: 'compensation_count', params: { dead_nozzles: p.dead_nz } }
+  ]);
+  s.compensation_count = compCount;
+
+  // Step 5: Firing bitmap (implicit - used in data rate)
+
+  // Step 6: Data throughput
+  const bytesPerFrame = p.imgW * p.imgH * p.bpp / 8;
+  const [dataRate] = await execParallel([
+    { fn: 'data_rate', params: { W: p.imgW, H: p.imgH, bpp: p.bpp, fps: p.fps } }
+  ]);
+  s.data_rate = dataRate;
+
+  // Step 7: Buffer fill
+  s.data_in += bytesPerFrame * p.fps * DT;
+  s.data_out += bytesPerFrame * p.fps * DT * (0.9 + 0.15 * Math.sin(s.tickCount * 0.005));
+  const bufMaxBytes = p.buf_max * 1e6;
+  const [bufPct] = await execParallel([
+    { fn: 'buffer_pct', params: { data_in: s.data_in, data_out: s.data_out, buf_max: bufMaxBytes } }
+  ]);
+  s.buffer_pct = bufPct;
+
+  // Step 8: Latency
+  const [latency] = await execParallel([
+    { fn: 'latency', params: { W: p.imgW, H: p.imgH, f_proc: p.f_proc, parallel: p.parallel } }
+  ]);
+  s.latency = latency;
+
+  // Throughput (effective)
+  const [effThroughput] = await execParallel([
+    { fn: 'throughput', params: { data_rate: s.data_rate, buffer_pct: s.buffer_pct } }
+  ]);
+  s.throughput = effThroughput;
+
+  
+  // ── LAYER A-E: Energy Chain (Parallel) ──
+  if (typeof execParallel === 'function') {
+    const [resA, resB, resC, resD, resE] = await execParallel([
+      { fn: 'power_electronics', params: { V_line: p.V_line, I_load: s.I_motor || s.I_load || 0, R_bus: p.R_bus, V_input: s.V_input || 0, t_r: p.t_r, t_f: p.t_f, f_sw: p.f_sw, C_gate: p.C_gate, V_gs: p.V_gs } },
+      { fn: 'motor_electrical_adv', params: { K_e: p.K_e, omega: s.omega || 0, V_bus: 600, D: 0.5, f_sw: p.f_sw, L_motor: p.L_motor, V_input: s.V_input || 0, I_load: s.I_motor || s.I_load || 0, R_motor: p.R_motor, k_h: p.k_h, f_elec: p.f_elec, B_field: p.B_field, k_e: p.k_e } },
+      { fn: 'current_signature', params: { omega: s.omega || 0, T_load: s.T_load || p.T_load, K_t: p.K_t, efficiency: p.efficiency, N_teeth: p.N_teeth, N_balls: p.N_balls, d_ball: p.d_ball, D_pitch: p.D_pitch, alpha_contact: p.alpha_contact } },
+      { fn: 'mechanical_drive', params: { T_net: s.T_net || 0, L_shaft: p.L_shaft, G_shear: p.G_shear, J_polar: p.J_polar, F_belt: s.F_belt || 0, L_belt: p.L_belt, E_belt: p.E_belt, A_belt: p.A_belt, omega: s.omega || 0, eta_gear: p.eta_gear, mu_b: p.mu_b || 0.01, F_radial: p.F_radial, r_bearing: p.r_bearing, k_shaft: p.k_shaft, J_shaft: p.J_shaft } },
+      { fn: 'load_energy', params: { T_tension: s.T_tension || 0, L_span: p.L_span, E_fabric: p.E_fabric || 1e9, A_fabric: p.A_fabric || 0.001, F_nip: s.F_nip || 0, r_roller: p.r_roller || 0.1, w_fabric: p.w_fabric || 1, k_fabric: p.k_fabric, A_heat: p.A_heat, dT_dx: s.dT_dx || 0, r_nozzle: p.r_nozzle, gamma_ink: p.gamma_ink, C_piezo: p.C_piezo, V_drive: p.V_drive } }
+    ]);
+    s.I_env = resC.I_env;
+    s.delta_I = resB.delta_I;
+  }
+  if (s.fault_stall) s.I_env *= 2.5;
+  if (s.fault_overcurrent) s.I_env *= 1.5;
+  
+  if (typeof hist !== 'undefined' && hist.I_signature) {
+     hist.I_signature.push(s.I_env || 0); if (hist.I_signature.length > 300) hist.I_signature.shift();
+     if (typeof spark !== 'undefined' && spark.I_signature) { spark.I_signature.push(s.I_env || 0); if (spark.I_signature.length > 50) spark.I_signature.shift(); }
+  }
+
+  s.tickCount++;
+  s.simTime += DT;
+
+  pushHist(hist.data_rate, s.data_rate / 1e6);
+  pushHist(hist.buffer_pct, s.buffer_pct);
+  pushHist(hist.latency, s.latency * 1e3);
+  pushHist(hist.color_error, s.color_error);
+  pushSpark(spark.DPI_out, s.DPI_out);
+  pushSpark(spark.color_error, s.color_error);
+  pushSpark(spark.halftone_error, s.halftone_error);
+  pushSpark(spark.compensation_count, s.compensation_count);
+  pushSpark(spark.data_rate, s.data_rate);
+  pushSpark(spark.buffer_pct, s.buffer_pct);
+  pushSpark(spark.latency, s.latency);
+  pushSpark(spark.throughput, s.throughput);
+}
+
+function drawChart(canvasId, data, color, refLine, refColor) {
+  const canvas = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 6, right: 10, bottom: 20, left: 48 };
+  const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+
+  let dMin = Infinity, dMax = -Infinity;
+  for (const v of data) { if (v < dMin) dMin = v; if (v > dMax) dMax = v; }
+  if (!isFinite(dMin)) { dMin = 0; dMax = 1; }
+  if (dMin === dMax) { dMin -= 1; dMax += 1; }
+  const range = dMax - dMin;
+  dMin -= range * 0.1; dMax += range * 0.1;
+
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.08)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (i / 4) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    const val = dMax - (i / 4) * (dMax - dMin);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#6b7280';
+    ctx.font = '9px SF Mono, Menlo, monospace'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(val >= 100 ? 0 : val >= 1 ? 1 : 2), pad.left - 4, y + 3);
+  }
+
+  if (refLine !== undefined) {
+    const ry = pad.top + (1 - (refLine - dMin) / (dMax - dMin)) * ch;
+    ctx.strokeStyle = refColor || '#D85A30'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, ry); ctx.lineTo(pad.left + cw, ry); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (data.length < 2) return;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = pad.left + (i / (HIST_LEN - 1)) * cw;
+    const y = pad.top + (1 - (data[i] - dMin) / (dMax - dMin)) * ch;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function sparkSVG(data, color, w, h) {
+  if (data.length < 2) return '';
+  let lo = Infinity, hi = -Infinity;
+  for (const v of data) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const range = hi - lo || 1;
+  const pts = data.map((v, i) => `${(i/(data.length-1)*w).toFixed(1)},${(h-((v-lo)/range)*(h-2)-1).toFixed(1)}`);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+}
+
+const stateVars = [
+  { key:'DPI_out', sym:'DPI_out', name:'Output DPI', unit:'dpi', color:'#378ADD', warn:null, crit:null },
+  { key:'color_error', sym:'ΔE', name:'Color Error (ΔE)', unit:'', color:'#D85A30', warn:0.05, crit:0.08 },
+  { key:'halftone_error', sym:'e_ht', name:'Halftone Error', unit:'', color:'#BA7517', warn:0.03, crit:0.05 },
+  { key:'compensation_count', sym:'N_comp', name:'Compensated Nozzles', unit:'', color:'#1D9E75', warn:50, crit:100 },
+  { key:'data_rate', sym:'R_data', name:'Data Rate', unit:'MB/s', color:'#378ADD', warn:null, crit:null },
+  { key:'buffer_pct', sym:'Buf%', name:'Buffer Fill', unit:'%', color:'#BA7517', warn:75, crit:90 },
+  { key:'latency', sym:'t_proc', name:'Processing Latency', unit:'ms', color:'#1D9E75', warn:50, crit:100 },
+  { key:'throughput', sym:'T_eff', name:'Effective Throughput', unit:'MB/s', color:'#378ADD', warn:null, crit:null },
+];
+
+function buildStateCards() {
+  document.getElementById('stateGrid').innerHTML = stateVars.map(sv =>
+    `<div class="state-card ok" id="sc_${sv.key}">
+      <div class="sc-left">
+        <div class="sc-sym">${sv.sym}</div>
+        <div class="sc-name">${sv.name}</div>
+        <div class="sc-val" id="scv_${sv.key}">—<span class="sc-unit">${sv.unit}</span></div>
+      </div>
+      <div class="sc-sparkline" id="sp_${sv.key}"></div>
+    </div>`
+  ).join('');
+}
+
+function updateStateCards() {
+  stateVars.forEach(sv => {
+    const val = state[sv.key];
+    const card = document.getElementById(`sc_${sv.key}`);
+    let status = 'ok';
+    if (sv.crit !== null && val > sv.crit) status = 'crit';
+    else if (sv.warn !== null && val > sv.warn) status = 'warn';
+    card.className = `state-card ${status}`;
+    document.getElementById(`scv_${sv.key}`).innerHTML = `${sigFig(val,4)}<span class="sc-unit">${sv.unit}</span>`;
+    document.getElementById(`sp_${sv.key}`).innerHTML = sparkSVG(spark[sv.key], sv.color, 64, 32);
+  });
+}
+
+function sigFig(n, sf) {
+  if (!Number.isFinite(n)) return '—';
+  if (n === 0) return '0';
+  return n.toFixed(Math.max(0, sf - 1 - Math.floor(Math.log10(Math.abs(n)))));
+}
+
+function updateSchematic() {
+  const s = state, p = PARAMS;
+  const bufWidth = 266 * (s.buffer_pct / 100);
+  const bufEl = document.getElementById('sch_buf_bar');
+  bufEl.setAttribute('width', bufWidth.toFixed(1));
+  const bufColor = s.buffer_pct > 90 ? 'var(--red)' : s.buffer_pct > 75 ? 'var(--amber)' : 'var(--green)';
+  bufEl.setAttribute('fill', bufColor);
+  document.getElementById('sch_buf_pct').textContent = s.buffer_pct.toFixed(1) + '%';
+  document.getElementById('sch_dpi_val').textContent = 'DPI_out = ' + s.DPI_out.toFixed(0) + ' | Latency = ' + (s.latency * 1e3).toFixed(2) + ' ms';
+}
+
+function formatTime(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateTopBar() {
+  document.getElementById('simTime').textContent = formatTime(state.simTime);
+  const bufPct = Math.min(100, Math.max(0, state.buffer_pct));
+  document.getElementById('bufProgress').style.width = bufPct.toFixed(1) + '%';
+  document.getElementById('bufProgress').style.background = bufPct > 90 ? 'var(--red)' : bufPct > 75 ? 'var(--amber)' : 'var(--green)';
+  document.getElementById('bufPct').textContent = bufPct.toFixed(1) + '%';
+}
+
+function updateChartValues() {
+  document.getElementById('ct_rate').textContent = (state.data_rate / 1e6).toFixed(1) + ' MB/s';
+  document.getElementById('ct_buf').textContent = state.buffer_pct.toFixed(1) + '%';
+  document.getElementById('ct_lat').textContent = (state.latency * 1e3).toFixed(2) + ' ms';
+  document.getElementById('ct_err').textContent = state.color_error.toFixed(4);
+}
+
+const btnPlay = document.getElementById('btnPlay');
+btnPlay.addEventListener('click', () => {
+  state.running = !state.running;
+  btnPlay.textContent = state.running ? '⏸ Pause' : '▶ Play';
+  btnPlay.classList.toggle('primary', !state.running);
+  btnPlay.classList.toggle('danger', state.running);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.running = false;
+  btnPlay.textContent = '▶ Play'; btnPlay.classList.add('primary'); btnPlay.classList.remove('danger');
+  state.DPI_out = PARAMS.dpi_in * PARAMS.scale;
+  state.color_error = PARAMS.icc_err;
+  state.halftone_error = PARAMS.base_ht_err;
+  state.compensation_count = Math.round(PARAMS.dead_nz * 1.5);
+  state.data_rate = 0; state.buffer_pct = 30;
+  state.latency = 0; state.throughput = 0;
+  state.data_in = 0; state.data_out = 0;
+  state.tickCount = 0; state.simTime = 0;
+  hist.data_rate=[]; hist.buffer_pct=[]; hist.latency=[]; hist.color_error=[];
+  Object.keys(spark).forEach(k => spark[k]=[]);
+});
+
+document.querySelectorAll('.speed-group .btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-group .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); state.speed = parseInt(btn.dataset.speed);
+  });
+});
+
+document.getElementById('formulaToggle').addEventListener('click', () => {
+  const body = document.getElementById('formulaBody');
+  const arrow = document.getElementById('formulaArrow');
+  const open = body.classList.toggle('open');
+  arrow.classList.toggle('open', open);
+});
+
+function render() {
+
+  const sigCanvas = document.getElementById('chart_signature');
+  if (sigCanvas && typeof drawChart === 'function' && hist.I_signature) {
+     drawChart('chart_signature', hist.I_signature, '#BA7517');
+     const ct_I_sig = document.getElementById('ct_I_sig');
+     if (ct_I_sig) ct_I_sig.textContent = (state.I_env || 0).toFixed(2) + ' A';
+  }
+
+  drawChart('chart_throughput', hist.data_rate, '#378ADD');
+  drawChart('chart_buffer', hist.buffer_pct, '#BA7517', 75, '#D85A30');
+  drawChart('chart_latency', hist.latency, '#1D9E75', 50, '#BA7517');
+  drawChart('chart_colorerr', hist.color_error, '#D85A30', 0.05, '#BA7517');
+  updateSchematic(); updateStateCards(); updateTopBar(); updateChartValues();
+}
+
+async function loop() {
+  if (state.running) {
+    for (let i = 0; i < state.speed; i++) {
+      await tick();
+    }
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+initWorkerPool();
+buildStateCards();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>

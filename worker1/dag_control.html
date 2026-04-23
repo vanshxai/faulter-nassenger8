@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DAG Telemetry | Worker 1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;800&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+<link rel="stylesheet" href="https://esm.sh/reactflow@11.10.1/dist/style.css">
+
+<style>
+  :root {
+    --bg-dark: #07080a;
+    --grid-color: rgba(0, 229, 255, 0.05);
+    --surface: #0f1218;
+    --surface-alt: #171a23;
+    --border: #232836;
+    --accent-cyan: #00e5ff;
+    --accent-cyan-dim: rgba(0, 229, 255, 0.15);
+    --accent-amber: #ffaa00;
+    --text-main: #e2e8f0;
+    --text-muted: #64748b;
+    --font-sans: 'Rajdhani', sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  body {
+    margin: 0; padding: 0; 
+    background-color: var(--bg-dark); 
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    overflow: hidden;
+  }
+
+  #root { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+
+  /* ── HEADER ── */
+  .header {
+    height: 50px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 20px; background: rgba(7, 8, 10, 0.8);
+    backdrop-filter: blur(12px); z-index: 100;
+  }
+  .header-title {
+    font-size: 18px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; display: flex; align-items: center; gap: 10px;
+  }
+  .header-title span { color: var(--accent-cyan); }
+  .status-indicator {
+    display: flex; align-items: center; gap: 8px; font-size: 13px;
+    font-family: var(--font-mono); font-weight: 600; text-transform: uppercase;
+  }
+  .status-dot { width: 8px; height: 8px; background: var(--text-muted); border-radius: 50%; }
+  .status-dot.live { background: var(--accent-cyan); box-shadow: 0 0 10px var(--accent-cyan); }
+
+  /* ── REACT FLOW CUSTOMIZATION ── */
+  .react-flow__bg { background: var(--bg-dark); }
+  .react-flow__node {
+    border-radius: 4px; border: 1px solid var(--border);
+    background: rgba(15, 18, 24, 0.85); backdrop-filter: blur(8px);
+    color: var(--text-main); padding: 0; overflow: hidden;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  }
+  .react-flow__node.selected {
+    border-color: var(--accent-cyan);
+    box-shadow: 0 0 0 1px var(--accent-cyan), 0 0 20px var(--accent-cyan-dim);
+  }
+  .react-flow__node:hover { border-color: var(--accent-amber); }
+  .react-flow__handle {
+    width: 6px; height: 16px; border-radius: 0; border: none;
+    background: var(--text-muted); transition: background 0.2s;
+  }
+  .react-flow__node.selected .react-flow__handle { background: var(--accent-cyan); }
+  .react-flow__edge-path { stroke: var(--border); stroke-width: 2; transition: stroke 0.2s; }
+  .react-flow__edge.animated .react-flow__edge-path {
+    stroke: var(--accent-cyan); stroke-dasharray: 5; animation: dashdraw 0.5s linear infinite;
+  }
+  @keyframes dashdraw { from { stroke-dashoffset: 10; } to { stroke-dashoffset: 0; } }
+
+  /* ── CUSTOM NODE INTERIOR ── */
+  .node-inner { min-width: 180px; }
+  .node-header {
+    background: var(--surface-alt); padding: 8px 12px;
+    font-size: 11px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+    border-bottom: 1px solid var(--border); display: flex; justify-content: space-between;
+  }
+  .node-header .level-tag { color: var(--accent-amber); font-family: var(--font-mono); font-size: 9px; }
+  .node-body { padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+  .node-val-label { font-size: 9px; color: var(--text-muted); text-transform: uppercase; }
+  .node-val { font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--accent-cyan); }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    position: absolute; right: 0; top: 50px; bottom: 0; width: 360px;
+    background: rgba(15, 18, 24, 0.95); backdrop-filter: blur(16px);
+    border-left: 1px solid var(--border); z-index: 50;
+    transform: translateX(100%); transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex; flex-direction: column;
+  }
+  .sidebar.open { transform: translateX(0); box-shadow: -10px 0 30px rgba(0,0,0,0.5); }
+  .sb-header { padding: 16px 20px; border-bottom: 1px solid var(--border); }
+  .sb-title { font-size: 16px; font-weight: 700; color: var(--accent-cyan); margin: 0; text-transform: uppercase; letter-spacing: 0.05em;}
+  .sb-subtitle { font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+  
+  .sb-content { flex: 1; overflow-y: auto; padding: 20px; }
+  .sb-section { margin-bottom: 24px; }
+  .sb-section-title {
+    font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--text-muted); border-bottom: 1px solid var(--border); padding-bottom: 6px; margin-bottom: 12px;
+  }
+  .latex-container {
+    background: #000; border: 1px solid var(--border); border-radius: 4px;
+    padding: 16px; overflow-x: auto; color: #fff; font-size: 14px; text-align: center;
+  }
+  
+  .io-grid { display: flex; flex-direction: column; gap: 8px; }
+  .io-row {
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface-alt); padding: 8px 12px; border-radius: 4px; border: 1px solid transparent;
+  }
+  .io-row:hover { border-color: var(--border); }
+  .io-key { font-family: var(--font-mono); font-size: 11px; color: #cbd5e1; }
+  .io-source { font-size: 9px; color: var(--text-muted); text-transform: uppercase; margin-left: 6px; }
+  .io-val { font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--accent-cyan); }
+  
+  input.io-edit {
+    background: #000; border: 1px solid var(--border); color: var(--accent-amber);
+    font-family: var(--font-mono); font-size: 12px; font-weight: 600;
+    padding: 4px 8px; width: 80px; text-align: right; outline: none; border-radius: 2px;
+    transition: border-color 0.2s;
+  }
+  input.io-edit:focus { border-color: var(--accent-amber); }
+
+  /* ── MINIMAP & CONTROLS OVERRIDES ── */
+  .react-flow__minimap { background: var(--surface); border: 1px solid var(--border); border-radius: 4px; }
+  .react-flow__minimap-mask { fill: rgba(0, 0, 0, 0.6); }
+  .react-flow__minimap-node { fill: var(--border); }
+  .react-flow__controls { box-shadow: none; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
+  .react-flow__controls-button { background: var(--surface-alt); border-bottom: 1px solid var(--border); fill: var(--text-main); }
+  .react-flow__controls-button:hover { background: var(--border); }
+  
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+</style>
+
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "reactflow": "https://esm.sh/reactflow@11.10.1?deps=react@18.2.0,react-dom@18.2.0",
+    "katex": "https://esm.sh/katex@0.16.8"
+  }
+}
+</script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body>
+  <div id="root"></div>
+
+<script type="text/babel" data-type="module">
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createRoot } from 'react-dom/client';
+import ReactFlow, { Background, Controls, MiniMap, applyNodeChanges, applyEdgeChanges, Handle, Position, MarkerType, useReactFlow, ReactFlowProvider } from 'reactflow';
+import katex from 'katex';
+
+// ═══════════════════════════════════════════════
+//  DATA DEFINITIONS (DAG & PARAMS)
+// ═══════════════════════════════════════════════
+const DAG_META = [
+  { level:1, title:'State & Temperature', formulas:[
+    { fn:'roll_radius', out:'r_new', eq:'r−v·dt/(2πr)', latex:'r(t) = r(t-1) - \\frac{v_{fab} dt}{2\\pi r}', inputs:['r|state','v_fabric|state','dt|const','r_min|param'] },
+    { fn:'roll_mass', out:'m_roll', eq:'m_core+ρπ(r²−r₀²)w', latex:'m_{roll} = m_c + \\rho \\pi (r^2 - r_0^2) w', inputs:['m_core|param','rho_fabric|param','r|state','r_core|param','w_fabric|param'] },
+    { fn:'motor_resistance', out:'R_motor_T', eq:'R₂₀(1+αΔT)', latex:'R_{mot}(T) = R_{20} (1 + \\alpha_{cu} (T_{mot} - 20))', inputs:['R_20|param','alpha_cu|param','T_motor|state'] },
+  ]},
+  { level:2, title:'Geometry & Electrical', formulas:[
+    { fn:'roll_inertia', out:'J', eq:'½m·r²', latex:'J = \\frac{1}{2} m_{roll} r^2', inputs:['m_roll|L1','r_new|L1'] },
+    { fn:'motor_di_dt', out:'di_dt', eq:'(V−IR−K_eω)/L', latex:'\\frac{di}{dt} = \\frac{V_{in} - I_{mot} R_{mot}(T) - K_e \\omega}{L_{mot}}', inputs:['V_input|state','I_motor|state','R_motor_T|L1','K_e|param','omega|state','L_motor|param'] },
+  ]},
+  { level:3, title:'Torques & Heat Sources', formulas:[
+    { fn:'motor_torque_raw', out:'T_motor_raw', eq:'K_t·I', latex:'T_{raw} = K_t \\cdot I_{mot}', inputs:['K_t|param','I_motor_new|L2'] },
+    { fn:'friction_torque', out:'T_fric', eq:'μ·m·g·r_sh', latex:'T_{fric} = \\mu m_{roll} g r_{sh}', inputs:['mu_bearing|param','m_roll|L1','g|const','r_shaft|param'] },
+    { fn:'cogging_torque', out:'T_cog', eq:'T_cog·sin(Nθ)', latex:'T_{cog} = T_{peak} \\sin(N_{slots} \\theta)', inputs:['T_cog_peak|param','N_slots|param','theta_rotor_new|L1'] },
+    { fn:'viscous_drag', out:'T_visc', eq:'B·ω', latex:'T_{visc} = B_{visc} \\omega', inputs:['B_visc|param','omega|state'] },
+    { fn:'dynamic_flux', out:'B_pk', eq:'min(μ₀μrNI/(2l), Bsat)', latex:'B_{pk} = \\min(\\frac{\\mu_0 \\mu_r N I_{mag}}{2 l_{gap}}, B_{sat})', inputs:['I_motor_new|L2','phi_lag|param','mu_r|param','N_turns|param','l_gap|param','B_sat|param'] },
+  ]},
+  { level:4, title:'Net Torque & Power Losses', formulas:[
+    { fn:'gear_loss', out:'T_gear_loss', eq:'T_raw(1−η)', latex:'T_{loss} = |T_{raw}| (1 - \\eta_{gear})', inputs:['T_motor_raw|L3','eta_gear|param'] },
+    { fn:'core_loss', out:'P_core', eq:'(k_h ω + k_e ω²)B²V', latex:'P_{core} = (k_h |\\omega| + k_e \\omega^2) B_{pk}^2 Vol', inputs:['k_h|param','k_e|param','omega|state','B_pk|L3','Vol_core|param'] },
+    { fn:'copper_loss', out:'P_cu', eq:'I²R(T)', latex:'P_{cu} = I_{mot}^2 R_{mot}(T)', inputs:['I_motor_new|L2','R_motor_T|L1'] },
+    { fn:'backlash_transmission', out:'T_transmitted', eq:'k(|Δθ|-b/2)', latex:'T_{trans} = k_{sh} (|\\Delta \\theta| - \\frac{b}{2}) sgn(\\Delta \\theta)', inputs:['theta_output_new|L1','theta_rotor_new|L1','gear_ratio|param','backlash|param','k_shaft|param'] },
+  ]},
+  { level:5, title:'Acceleration & Thermal', formulas:[
+    { fn:'temp_rate', out:'dT_dt', eq:'(P−ΔT/R)/C', latex:'\\frac{dT}{dt} = \\frac{P_{cu} + P_{core} - \\frac{T_{mot} - T_{amb}}{R_{th}}}{C_{th}}', inputs:['P_cu|L4','P_core|L4','T_motor|state','T_amb|param','R_th|param','C_th|param'] },
+    { fn:'alpha', out:'alpha_val', eq:'T_net/J', latex:'\\alpha = \\frac{T_{net}}{J}', inputs:['J|L2','T_net|L4'] },
+  ]},
+  { level:6, title:'Velocities & Temp', formulas:[
+    { fn:'omega_update', out:'omega_new', eq:'ω+α·dt', latex:'\\omega(t) = \\omega(t-1) + \\alpha \\cdot dt', inputs:['omega|state','alpha_val|L5','dt|const'] },
+    { fn:'motor_temp', out:'T_motor_new', eq:'T+dT·dt', latex:'T_{mot}(t) = T_{mot}(t-1) + \\frac{dT}{dt} dt', inputs:['T_motor|state','dT_dt|L5','dt|const'] },
+  ]},
+  { level:7, title:'Fabric Slip & Speed', formulas:[
+    { fn:'fabric_slip_stribeck', out:'v_slip', eq:'Stribeck(T)', latex:'v_{slip} = T>F_{adh}? \\dots : 0', inputs:['T_tension|state','v_slip_prev|state','m_roll|L1','g|const','mu_s|param','mu_k|param','k_dec|param','slip_ratio|param','k_micro|param','v_roller|L6','v_fabric_free|state'] },
+  ]},
+  { level:8, title:'Web Tension', formulas:[
+    { fn:'web_tension', out:'T_tension_new', eq:'EA(Δv)/v+T₀', latex:'T_{ten} = E A \\frac{v_{down} - v_{fab}}{v_{nom}} + T_0', inputs:['E_fabric|param','A_fabric|param','v_downstream|param','v_fabric|L7','v_nominal|param','T_0|param'] },
+  ]},
+  { level:9, title:'Dancer Forces & PID Inputs', formulas:[
+    { fn:'dancer_cyl_force', out:'F_cyl', eq:'P·A·V/(V+Ax)', latex:'F_{cyl} = P_s A_c \\frac{V_d}{V_d + A_c x_d}', inputs:['P_supply|param','A_cyl|param','V_dead|param','x_dancer|state'] },
+    { fn:'dancer_seal_fric', out:'F_seal', eq:'Fc+Bv+Fs·e^|v|', latex:'F_{seal} = F_c + B_v v_d + F_s e^{-|v_d|/v_s} sgn(v_d)', inputs:['F_c|param','B_v|param','v_dancer|state','F_s|param','v_s|param'] },
+    { fn:'pid_integral', out:'integral_new', eq:'∫+e·dt', latex:'\\int e = \\int e + e \\cdot dt', inputs:['integral|state','e|L8','dt|const'] },
+    { fn:'pid_derivative', out:'derivative', eq:'(e−e_p)/dt', latex:'\\frac{de}{dt} = \\frac{e(t) - e(t-1)}{dt}', inputs:['e|L8','e_prev|state','dt|const'] },
+  ]},
+  { level:10, title:'Dancer Position & PID Output', formulas:[
+    { fn:'dancer_position', out:'x_dancer_new', eq:'(T−Fc−Fs)/k', latex:'x_{dancer} = \\frac{T_{ten} - F_{cyl} - F_{seal}}{k_{spring}}', inputs:['T_tension_new|L8','F_cyl|L9','F_seal|L9','k_spring|param'] },
+    { fn:'pid_output', out:'u', eq:'Kp·e+Ki∫e+Kd·de', latex:'u = K_p e + K_i \\int e + K_d \\frac{de}{dt}', inputs:['Kp|param','e|L8','Ki|param','integral_new|L9','Kd|param','derivative|L9'] },
+  ]},
+  { level:11, title:'Final Updates', formulas:[
+    { fn:'dancer_velocity', out:'v_dancer_new', eq:'Δx/dt', latex:'v_{dancer} = \\frac{x_d(t) - x_d(t-1)}{dt}', inputs:['x_dancer_new|L10','x_dancer|state','dt|const'] },
+    { fn:'clamp_voltage', out:'V_input_new', eq:'clamp(u)', latex:'V_{in} = \\max(V_{min}, \\min(V_{max}, u))', inputs:['u|L10','V_min|param','V_max|param'] },
+  ]}
+];
+
+const PARAM_RANGES = {
+  r_max:[0.15,0.5,0.001], r_core:[0.02,0.1,0.001], r_min:[0.02,0.1,0.001],
+  w_fabric:[0.5,3,0.01], rho_fabric:[0.1,1,0.001], m_core:[0.5,10,0.1],
+  R_motor:[0.5,10,0.01], L_motor:[0.005,0.1,0.001], K_t:[0.1,2,0.01], K_e:[0.1,2,0.01],
+  V_max:[12,96,1], V_min:[0,12,1],
+  mu_bearing:[0.0005,0.01,0.0001], r_shaft:[0.01,0.05,0.001],
+  E_fabric:[10000,200000,1000], A_fabric:[0.0001,0.01,0.0001], T_0:[5,50,0.5],
+  T_setpoint:[10,150,0.5], v_downstream:[0.1,2,0.01], v_nominal:[0.1,2,0.01],
+  k_spring:[100,2000,10], Kp:[0,20,0.01], Ki:[0,5,0.01], Kd:[0,2,0.001],
+  R_th:[0.5,10,0.1], C_th:[10,200,1], T_amb:[15,45,0.5],
+  alpha_cu:[0.001,0.01,0.0001], R_20:[0.5,5,0.1], k_h:[0.001,0.1,0.001], k_e:[0.0001,0.01,0.0001],
+  Vol_core:[0.001,0.05,0.001], phi_lag:[0,1.5,0.01], mu_r:[500,5000,10], N_turns:[10,500,1],
+  l_gap:[0.0005,0.01,0.0001], B_sat:[1.0,2.5,0.1], T_cog_peak:[0.1,5.0,0.1], N_slots:[4,48,1],
+  B_visc:[0.01,0.5,0.01], eta_gear:[0.8,1.0,0.01], backlash:[0.001,0.05,0.001], k_shaft:[1000,20000,100], gear_ratio:[1,50,1],
+  mu_s:[0.1,1.0,0.01], mu_k:[0.05,0.8,0.01], k_dec:[10,100,1], slip_ratio:[1.1,3.0,0.1], k_micro:[0.0001,0.01,0.0001],
+  P_supply:[1e5,1e6,1e4], A_cyl:[0.001,0.05,0.001], V_dead:[0.0001,0.01,0.0001],
+  F_c:[1,50,1], B_v:[10,200,1], F_s:[5,100,1], v_s:[0.001,0.1,0.001], F_slip_limit:[10,500,10], k_slip:[0.0001,0.01,0.0001]
+};
+
+// Global Store to bypass React state for high-frequency node updates
+window.SIM_STATE = {
+  R: {}, params: {}, state: {}, DT: 0.01, g: 9.81, connected: false
+};
+
+// ═══════════════════════════════════════════════
+//  REACT COMPONENTS
+// ═══════════════════════════════════════════════
+
+// 1. Custom Node (High-Performance telemetry)
+const TelemetryNode = ({ data, selected }) => {
+  const [val, setVal] = useState('—');
+
+  useEffect(() => {
+    // Listen for high-frequency ticks directly on window to avoid whole-tree renders
+    const handler = () => {
+      const live = window.SIM_STATE.R[data.out];
+      setVal(live !== undefined ? Number(live).toFixed(4) : '—');
+    };
+    window.addEventListener('sim-tick', handler);
+    // Initial paint
+    handler();
+    return () => window.removeEventListener('sim-tick', handler);
+  }, [data.out]);
+
+  return (
+    <div className={`node-inner`}>
+      <Handle type="target" position={Position.Left} isConnectable={false} />
+      <div className="node-header">
+        <span>{data.fn}</span>
+        <span className="level-tag">L{data.level}</span>
+      </div>
+      <div className="node-body">
+        <div className="node-val-label">Output [{data.out}]</div>
+        <div className="node-val">{val}</div>
+      </div>
+      <Handle type="source" position={Position.Right} isConnectable={false} />
+    </div>
+  );
+};
+
+const nodeTypes = { telemetry: TelemetryNode };
+
+// 2. Main App
+const FlowApp = () => {
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Setup DAG layout
+  useEffect(() => {
+    const nds = [];
+    const egs = [];
+    const outMap = {}; // Maps output_name -> node_id
+
+    // Pass 1: Create nodes and map outputs
+    DAG_META.forEach((levelBlock, lIdx) => {
+      const levelX = lIdx * 320 + 50;
+      const totalInLevel = levelBlock.formulas.length;
+      const startY = -((totalInLevel - 1) * 120) / 2;
+
+      levelBlock.formulas.forEach((f, fIdx) => {
+        outMap[f.out] = f.fn;
+        nds.push({
+          id: f.fn,
+          type: 'telemetry',
+          position: { x: levelX, y: startY + fIdx * 120 },
+          data: { ...f, level: levelBlock.level }
+        });
+      });
+    });
+
+    // Pass 2: Create edges based on dependencies
+    DAG_META.forEach(levelBlock => {
+      levelBlock.formulas.forEach(f => {
+        f.inputs.forEach(inp => {
+          const [key, source] = inp.split('|');
+          if (source.startsWith('L') && outMap[key]) {
+            egs.push({
+              id: `e-${outMap[key]}-${f.fn}-${key}`,
+              source: outMap[key],
+              target: f.fn,
+              animated: true,
+            });
+          }
+        });
+      });
+    });
+
+    setNodes(nds);
+    setEdges(egs);
+  }, []);
+
+  // Setup BroadcastChannel
+  useEffect(() => {
+    const channel = new BroadcastChannel('worker1_dag');
+    let timeout;
+    
+    channel.onmessage = (e) => {
+      if (e.data.type === 'STATE_UPDATE') {
+        window.SIM_STATE = { ...window.SIM_STATE, ...e.data, connected: true };
+        window.dispatchEvent(new Event('sim-tick'));
+        if (!isConnected) setIsConnected(true);
+        
+        clearTimeout(timeout);
+        timeout = setTimeout(() => {
+          window.SIM_STATE.connected = false;
+          setIsConnected(false);
+        }, 1500);
+      }
+    };
+    channel.postMessage({ type: 'REQUEST_STATE' });
+    
+    // Publish parameter updates globally so Sidebar can use it
+    window.postParamUpdate = (key, value) => {
+      channel.postMessage({ type: 'PARAM_UPDATE', key, value });
+      // Optimistic update
+      window.SIM_STATE.params[key] = value;
+      window.dispatchEvent(new Event('sim-tick'));
+    };
+
+    return () => { channel.close(); clearTimeout(timeout); };
+  }, [isConnected]);
+
+  const onNodesChange = useCallback((changes) => setNodes((nds) => applyNodeChanges(changes, nds)), []);
+  const onEdgesChange = useCallback((changes) => setEdges((eds) => applyEdgeChanges(changes, eds)), []);
+
+  const onNodeClick = (e, node) => {
+    setSelectedNode(node.data);
+    setSidebarOpen(true);
+  };
+  const onPaneClick = () => setSidebarOpen(false);
+
+  return (
+    <>
+      <div className="header">
+        <div className="header-title"><span>N8</span> Digital Twin Telemetry</div>
+        <div className="status-indicator">
+          <div className={`status-dot ${isConnected ? 'live' : ''}`}></div>
+          <span style={{color: isConnected ? 'var(--accent-cyan)' : 'var(--text-muted)'}}>
+            {isConnected ? 'Live Link Active' : 'Awaiting Simulator...'}
+          </span>
+        </div>
+      </div>
+      
+      <div style={{ flex: 1, position: 'relative' }}>
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodesChange={onNodesChange}
+          onEdgesChange={onEdgesChange}
+          onNodeClick={onNodeClick}
+          onPaneClick={onPaneClick}
+          nodeTypes={nodeTypes}
+          fitView
+          minZoom={0.1}
+        >
+          <Background color="var(--border)" gap={20} size={1} />
+          <Controls />
+          <MiniMap 
+             nodeColor="var(--border)" 
+             maskColor="rgba(7, 8, 10, 0.7)" 
+             style={{ backgroundColor: 'var(--surface-alt)' }} 
+          />
+        </ReactFlow>
+
+        {/* SIDEBAR */}
+        <Sidebar data={selectedNode} isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      </div>
+    </>
+  );
+};
+
+// 3. Sidebar Component
+const Sidebar = ({ data, isOpen, onClose }) => {
+  const [liveVals, setLiveVals] = useState({});
+
+  useEffect(() => {
+    if (!isOpen || !data) return;
+    const handler = () => {
+      const s = window.SIM_STATE;
+      const newVals = {};
+      data.inputs.forEach(inp => {
+        const [key, source] = inp.split('|');
+        if (source === 'param') newVals[key] = s.params[key];
+        else if (source === 'state') newVals[key] = s.state[key];
+        else if (source === 'const') newVals[key] = (key==='dt'?s.DT:9.81);
+        else newVals[key] = s.R[key];
+      });
+      newVals[data.out] = s.R[data.out];
+      setLiveVals(newVals);
+    };
+    window.addEventListener('sim-tick', handler);
+    handler();
+    return () => window.removeEventListener('sim-tick', handler);
+  }, [isOpen, data]);
+
+  const handleParamChange = (key, val) => {
+    const v = parseFloat(val);
+    if (!isNaN(v)) window.postParamUpdate(key, v);
+  };
+
+  const renderMath = (latex) => {
+    try { return { __html: katex.renderToString(latex, { displayMode: true, throwOnError: false }) }; }
+    catch(e) { return { __html: latex }; }
+  };
+
+  if (!data) return <div className={`sidebar ${isOpen ? 'open' : ''}`}></div>;
+
+  return (
+    <div className={`sidebar ${isOpen ? 'open' : ''}`}>
+      <div className="sb-header">
+        <h2 className="sb-title">{data.fn}()</h2>
+        <div className="sb-subtitle">Level {data.level} Node</div>
+      </div>
+      
+      <div className="sb-content">
+        <div className="sb-section">
+          <div className="sb-section-title">Mathematical Model</div>
+          <div className="latex-container" dangerouslySetInnerHTML={renderMath(data.latex)}></div>
+        </div>
+
+        <div className="sb-section">
+          <div className="sb-section-title">Signal Inputs</div>
+          <div className="io-grid">
+            {data.inputs.map(inp => {
+              const [key, source] = inp.split('|');
+              const isParam = source === 'param' && PARAM_RANGES[key];
+              const val = liveVals[key];
+              return (
+                <div className="io-row" key={key}>
+                  <div>
+                    <span className="io-key">{key}</span>
+                    <span className="io-source">[{source}]</span>
+                  </div>
+                  {isParam ? (
+                    <input 
+                      type="number" className="io-edit" 
+                      min={PARAM_RANGES[key][0]} max={PARAM_RANGES[key][1]} step={PARAM_RANGES[key][2]}
+                      defaultValue={val !== undefined ? val : ''}
+                      onChange={(e) => handleParamChange(key, e.target.value)}
+                    />
+                  ) : (
+                    <span className="io-val" style={{color: source==='state'?'var(--accent-amber)':'var(--accent-cyan)'}}>
+                      {val !== undefined ? Number(val).toFixed(4) : '—'}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="sb-section">
+          <div className="sb-section-title">Computed Output</div>
+          <div className="io-row" style={{borderColor: 'var(--accent-cyan)'}}>
+            <span className="io-key" style={{color:'#fff'}}>{data.out}</span>
+            <span className="io-val" style={{fontSize:'14px'}}>{liveVals[data.out] !== undefined ? Number(liveVals[data.out]).toFixed(4) : '—'}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── BOOTSTRAP ──
+const root = createRoot(document.getElementById('root'));
+root.render(<ReactFlowProvider><FlowApp /></ReactFlowProvider>);
+
+</script>
+</body>
+</html>

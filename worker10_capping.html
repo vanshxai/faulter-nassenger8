@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker 10 — Maintenance/Capping Station | Nassenger 8 Digital Twin</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-alt: #f7f8fa;
+  --text: #1a1d23;
+  --text-muted: #6b7280;
+  --border: #e2e5ea;
+  --accent: #378ADD;
+  --accent-soft: rgba(55,138,221,0.1);
+  --green: #1D9E75;
+  --amber: #BA7517;
+  --red: #D85A30;
+  --chart-grid: rgba(0,0,0,0.08);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-alt: #22252f;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border: #2d3040;
+    --accent: #5a9fef;
+    --accent-soft: rgba(90,159,239,0.12);
+    --chart-grid: rgba(255,255,255,0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.3);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar h1 span {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.sim-time {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn:hover { background: var(--surface-alt); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.9; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: var(--red); color: #fff; }
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.speed-group {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.speed-group .btn {
+  border: none;
+  border-radius: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.speed-group .btn + .btn { border-left: 1px solid var(--border); }
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.progress-bar {
+  width: 100px;
+  height: 6px;
+  background: var(--surface-alt);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.main {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  min-height: calc(100vh - 52px);
+  align-items: flex-start;
+}
+
+.col-left, .col-right {
+  flex: 0 0 280px;
+  min-width: 0;
+}
+
+.col-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.card-body { padding: 12px 14px; }
+
+.slider-group { margin-bottom: 10px; }
+.slider-group:last-child { margin-bottom: 0; }
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.slider-label .name { color: var(--text); font-weight: 500; }
+.slider-label .val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.state-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.state-card.ok { border-color: var(--green); }
+.state-card.warn { border-color: var(--amber); background: rgba(186,117,23,0.06); }
+.state-card.crit { border-color: var(--red); background: rgba(216,90,48,0.06); }
+
+.state-card .sc-left { min-width: 0; }
+.state-card .sc-sym {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.state-card .sc-name { font-size: 11px; color: var(--text-muted); }
+.state-card .sc-val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.state-card .sc-unit { font-size: 10px; color: var(--text-muted); margin-left: 2px; font-weight: 400; }
+.state-card .sc-sparkline { width: 64px; height: 32px; flex-shrink: 0; }
+
+.schematic-wrap { padding: 12px; display: flex; justify-content: center; }
+.schematic-wrap svg { max-width: 100%; height: auto; }
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.chart-title {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+.chart-title .ct-value {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chart-canvas-wrap { padding: 6px 8px 8px; position: relative; }
+.chart-canvas-wrap canvas { width: 100%; display: block; }
+
+.parallel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  margin-left: 8px;
+}
+
+.formula-chain-toggle {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.formula-chain-toggle .arrow { transition: transform 0.2s ease; font-size: 10px; }
+.formula-chain-toggle .arrow.open { transform: rotate(90deg); }
+
+.formula-chain-body {
+  display: none;
+  padding: 0 14px 14px;
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", monospace;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.formula-chain-body.open { display: block; }
+
+.formula-step {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.formula-step:last-child { border-bottom: none; }
+
+.formula-step .step-num { font-weight: 700; color: var(--accent); margin-right: 6px; }
+
+.formula-step .step-title {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+}
+
+.formula-step .step-eq { color: var(--accent); font-size: 11px; }
+
+.formula-step .parallel-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.formula-step .sequential-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(55,138,221,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(55,138,221,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media (max-width: 900px) {
+  .main { flex-direction: column; }
+  .col-left, .col-right { flex: none; width: 100%; }
+  .charts-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Worker 10 — Capping Station<span>Nassenger 8 Digital Twin</span></h1>
+    <div class="sim-time" id="simTime">00:00:00</div>
+    <button class="btn primary" id="btnPlay">▶ Play</button>
+    <button class="btn" id="btnReset">↺ Reset</button>
+    <div class="speed-group">
+      <button class="btn active" data-speed="1">1x</button>
+      <button class="btn" data-speed="5">5x</button>
+      <button class="btn" data-speed="10">10x</button>
+      <button class="btn" data-speed="50">50x</button>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <span>CRI:</span>
+    <div class="progress-bar"><div class="progress-fill" id="criProgress"></div></div>
+    <span id="criPct">0%</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- LEFT: Parameters -->
+  <div class="col-left">
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Seal & Cap</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Seal Stiffness</span><span class="val" id="v_k_seal">1500.0 N/m</span></div>
+          <input type="range" id="s_k_seal" min="500" max="5000" step="10" value="1500">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Cap Compression</span><span class="val" id="v_delta">0.002 m</span></div>
+          <input type="range" id="s_delta" min="0.0005" max="0.005" step="0.0001" value="0.002">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Vacuum Pressure</span><span class="val" id="v_P_vac">80000.0 Pa</span></div>
+          <input type="range" id="s_P_vac" min="40000" max="100000" step="1000" value="80000">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Suction Pump</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Suction Coeff</span><span class="val" id="v_Cv">0.0008 m3/Pas</span></div>
+          <input type="range" id="s_Cv" min="0.0001" max="0.005" step="0.0001" value="0.0008">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Ink Density</span><span class="val" id="v_rho_ink">1000.0 kg/m3</span></div>
+          <input type="range" id="s_rho_ink" min="800" max="1200" step="10" value="1000">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Purge Duration</span><span class="val" id="v_t_purge">0.50 s</span></div>
+          <input type="range" id="s_t_purge" min="0.1" max="2.0" step="0.05" value="0.5">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Wiper Blade</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Wiper Friction</span><span class="val" id="v_mu_wipe">0.350</span></div>
+          <input type="range" id="s_mu_wipe" min="0.1" max="0.8" step="0.01" value="0.35">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Contact Pressure</span><span class="val" id="v_P_contact">50000.0 Pa</span></div>
+          <input type="range" id="s_P_contact" min="10000" max="150000" step="1000" value="50000">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Blade Area</span><span class="val" id="v_A_blade">0.0004 m2</span></div>
+          <input type="range" id="s_A_blade" min="0.0001" max="0.001" step="0.00005" value="0.0004">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Optimal Wipe Force</span><span class="val" id="v_F_opt">10.0 N</span></div>
+          <input type="range" id="s_F_opt" min="3" max="30" step="0.5" value="10">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Clog Risk</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">P0 (Base Prob)</span><span class="val" id="v_P0">0.050</span></div>
+          <input type="range" id="s_P0" min="0.01" max="0.3" step="0.005" value="0.05">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Tau (Time Const)</span><span class="val" id="v_tau">120.0 s</span></div>
+          <input type="range" id="s_tau" min="30" max="600" step="10" value="120">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Purge Eff.</span><span class="val" id="v_purge_eff">0.850</span></div>
+          <input type="range" id="s_purge_eff" min="0.3" max="0.99" step="0.01" value="0.85">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">CRI Warn</span><span class="val" id="v_CRI_warn">0.30</span></div>
+          <input type="range" id="s_CRI_warn" min="0.1" max="0.6" step="0.01" value="0.3">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">CRI Critical</span><span class="val" id="v_CRI_crit">0.60</span></div>
+          <input type="range" id="s_CRI_crit" min="0.4" max="0.9" step="0.01" value="0.6">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CENTER: Visualisation -->
+  <div class="col-center">
+
+    <!-- Schematic -->
+    <div class="card">
+      <div class="card-header">Schematic — Worker 10 Capping Station</div>
+      <div class="schematic-wrap">
+        <svg id="schematic" viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--chart-grid)" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="600" height="240" fill="url(#grid)" opacity="0.4"/>
+
+          <!-- Printhead -->
+          <rect x="220" y="30" width="160" height="50" rx="4" fill="var(--surface-alt)" stroke="var(--accent)" stroke-width="2"/>
+          <text x="300" y="58" font-size="10" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Printhead</text>
+          <!-- Nozzles -->
+          <g fill="var(--accent)">
+            <circle cx="240" cy="80" r="3"/><circle cx="260" cy="80" r="3"/><circle cx="280" cy="80" r="3"/>
+            <circle cx="300" cy="80" r="3"/><circle cx="320" cy="80" r="3"/><circle cx="340" cy="80" r="3"/>
+            <circle cx="360" cy="80" r="3"/>
+          </g>
+
+          <!-- Cap sealing -->
+          <rect id="sch_cap" x="230" y="95" width="140" height="20" rx="3" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="300" y="109" font-size="8" fill="var(--accent)" text-anchor="middle" font-weight="600">Cap Seal</text>
+
+          <!-- Wiper blade -->
+          <rect id="sch_wiper" x="160" y="90" width="12" height="40" rx="2" fill="var(--amber)" opacity="0.5" stroke="var(--amber)" stroke-width="1.5"/>
+          <text x="166" y="145" font-size="8" fill="var(--amber)" text-anchor="middle" font-weight="600">Wiper</text>
+          <path id="sch_wipe_motion" d="M 166 90 L 166 130" stroke="var(--amber)" stroke-width="1" stroke-dasharray="3,2" opacity="0.6"/>
+
+          <!-- Suction pump -->
+          <circle cx="440" cy="110" r="30" fill="var(--surface-alt)" stroke="var(--green)" stroke-width="2"/>
+          <text x="440" y="106" font-size="8" fill="var(--green)" text-anchor="middle" font-weight="600">Suction</text>
+          <text x="440" y="118" font-size="8" fill="var(--green)" text-anchor="middle" font-weight="600">Pump</text>
+          <line x1="370" y1="110" x2="410" y2="110" stroke="var(--green)" stroke-width="1.5" stroke-dasharray="4,3"/>
+          <polygon points="405,106 415,110 405,114" fill="var(--green)" opacity="0.6"/>
+
+          <!-- Vacuum indicator -->
+          <rect x="425" y="148" width="30" height="50" rx="3" fill="var(--surface-alt)" stroke="var(--text-muted)" stroke-width="1"/>
+          <text x="440" y="177" font-size="7" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Vac</text>
+          <line x1="440" y1="148" x2="440" y2="190" stroke="var(--text-muted)" stroke-width="1"/>
+          <line id="sch_vac_level" x1="425" y1="175" x2="455" y2="175" stroke="var(--red)" stroke-width="1.5"/>
+
+          <!-- CRI display -->
+          <rect x="490" y="80" width="90" height="40" rx="4" fill="var(--surface-alt)" stroke="var(--red)" stroke-width="1.5"/>
+          <text x="535" y="96" font-size="8" fill="var(--text-muted)" text-anchor="middle" font-weight="600">CRI</text>
+          <text id="sch_cri_val" x="535" y="112" font-size="14" fill="var(--red)" text-anchor="middle" font-weight="700" font-family="SF Mono, Menlo, monospace">0.00</text>
+
+          <text x="300" y="225" font-size="9" fill="var(--text-muted)" text-anchor="middle">Cap Seal + Wiper Blade + Suction Pump — Maintenance Station</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-title">Current Signature i(t) <span class="ct-value" id="ct_I_sig" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_signature" height="130"></canvas></div>
+      </div>
+
+
+      <div class="chart-card">
+        <div class="chart-title">Current Signature i(t) <span class="ct-value" id="ct_I_sig" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_signature" height="130"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">CRI Index <span class="ct-value" id="ct_CRI" style="color:#D85A30">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_cri" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Suction Flow Rate <span class="ct-value" id="ct_Q" style="color:#1D9E75">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_suction" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Cap Pressure <span class="ct-value" id="ct_Pcap" style="color:#378ADD">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_pressure" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Wipe Streaks <span class="ct-value" id="ct_streak" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_streaks" height="130"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Formula Chain -->
+    <div class="card">
+      <div class="formula-chain-toggle" id="formulaToggle">
+        <span>Formula Chain (8 steps, parallel exec) <span class="parallel-badge">Parallel</span></span>
+        <span class="arrow" id="formulaArrow">▶</span>
+      </div>
+      <div class="formula-chain-body" id="formulaBody">
+        <div class="formula-step">
+          <span class="step-title">Step 1 — Cap Seal Contact <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">F_seal = k_seal * delta_compression</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 2 — Capping Pressure <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">P_cap = P_atm - P_vacuum</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 3 — Suction Flow <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">Q_suction = C_v * sqrt(deltaP / rho)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 4 — Ink Extraction Volume <span class="sequential-tag">1 formula</span></span>
+          <span class="step-eq">V_extracted = Q_suction * t_purge</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 5 — Wiper Blade Mechanics

@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Worker 4 — Fabric Flattening | Nassenger 8 Digital Twin</title>
+<style>
+:root {
+  --bg: #f0f2f5;
+  --surface: #ffffff;
+  --surface-alt: #f7f8fa;
+  --text: #1a1d23;
+  --text-muted: #6b7280;
+  --border: #e2e5ea;
+  --accent: #378ADD;
+  --accent-soft: rgba(55,138,221,0.1);
+  --green: #1D9E75;
+  --amber: #BA7517;
+  --red: #D85A30;
+  --chart-grid: rgba(0,0,0,0.08);
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+  --radius: 10px;
+  --radius-lg: 14px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-alt: #22252f;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+    --border: #2d3040;
+    --accent: #5a9fef;
+    --accent-soft: rgba(90,159,239,0.12);
+    --chart-grid: rgba(255,255,255,0.06);
+    --shadow: 0 1px 3px rgba(0,0,0,0.2);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,0.3);
+  }
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.topbar h1 {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.topbar h1 span {
+  color: var(--text-muted);
+  font-weight: 400;
+  margin-left: 6px;
+  font-size: 13px;
+}
+
+.sim-time {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 13px;
+  color: var(--text-muted);
+  background: var(--surface-alt);
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.btn:hover { background: var(--surface-alt); }
+.btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+.btn.primary:hover { opacity: 0.9; }
+.btn.danger { border-color: var(--red); color: var(--red); }
+.btn.danger:hover { background: var(--red); color: #fff; }
+.btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+.speed-group {
+  display: flex;
+  gap: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.speed-group .btn {
+  border: none;
+  border-radius: 0;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.speed-group .btn + .btn { border-left: 1px solid var(--border); }
+
+.progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.progress-bar {
+  width: 100px;
+  height: 6px;
+  background: var(--surface-alt);
+  border-radius: 3px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--green);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+
+.main {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  min-height: calc(100vh - 52px);
+  align-items: flex-start;
+}
+
+.col-left, .col-right {
+  flex: 0 0 280px;
+  min-width: 0;
+}
+
+.col-center {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 10px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-alt);
+}
+
+.card-body { padding: 12px 14px; }
+
+.slider-group { margin-bottom: 10px; }
+.slider-group:last-child { margin-bottom: 0; }
+
+.slider-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.slider-label .name { color: var(--text); font-weight: 500; }
+.slider-label .val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 600;
+  min-width: 60px;
+  text-align: right;
+}
+
+input[type="range"] {
+  width: 100%;
+  height: 4px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--surface);
+  box-shadow: 0 0 0 1px var(--accent);
+  cursor: pointer;
+}
+
+.state-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.state-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px;
+  padding: 8px 10px;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.state-card.ok { border-color: var(--green); }
+.state-card.warn { border-color: var(--amber); background: rgba(186,117,23,0.06); }
+.state-card.crit { border-color: var(--red); background: rgba(216,90,48,0.06); }
+
+.state-card .sc-left { min-width: 0; }
+.state-card .sc-sym {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.state-card .sc-name { font-size: 11px; color: var(--text-muted); }
+.state-card .sc-val {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.state-card .sc-unit { font-size: 10px; color: var(--text-muted); margin-left: 2px; font-weight: 400; }
+.state-card .sc-sparkline { width: 64px; height: 32px; flex-shrink: 0; }
+
+.schematic-wrap { padding: 12px; display: flex; justify-content: center; }
+.schematic-wrap svg { max-width: 100%; height: auto; }
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.chart-title {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+}
+
+.chart-title .ct-value {
+  font-family: "SF Mono", "Menlo", monospace;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.chart-canvas-wrap { padding: 6px 8px 8px; position: relative; }
+.chart-canvas-wrap canvas { width: 100%; display: block; }
+
+.parallel-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  margin-left: 8px;
+}
+
+.formula-chain-toggle {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.formula-chain-toggle .arrow { transition: transform 0.2s ease; font-size: 10px; }
+.formula-chain-toggle .arrow.open { transform: rotate(90deg); }
+
+.formula-chain-body {
+  display: none;
+  padding: 0 14px 14px;
+  font-size: 12px;
+  font-family: "SF Mono", "Menlo", monospace;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.formula-chain-body.open { display: block; }
+
+.formula-step {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.formula-step:last-child { border-bottom: none; }
+
+.formula-step .step-num { font-weight: 700; color: var(--accent); margin-right: 6px; }
+
+.formula-step .step-title {
+  font-weight: 600;
+  color: var(--text);
+  display: block;
+  margin-bottom: 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 11px;
+}
+
+.formula-step .step-eq { color: var(--accent); font-size: 11px; }
+
+.formula-step .parallel-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(29,158,117,0.1);
+  color: var(--green);
+  border: 1px solid rgba(29,158,117,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.formula-step .sequential-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: rgba(55,138,221,0.1);
+  color: var(--accent);
+  border: 1px solid rgba(55,138,221,0.2);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+@media (max-width: 900px) {
+  .main { flex-direction: column; }
+  .col-left, .col-right { flex: none; width: 100%; }
+  .charts-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-left">
+    <h1>Worker 4 — Fabric Flattening<span>Nassenger 8 Digital Twin</span></h1>
+    <div class="sim-time" id="simTime">00:00:00</div>
+    <button class="btn primary" id="btnPlay">▶ Play</button>
+    <button class="btn" id="btnReset">↺ Reset</button>
+    <div class="speed-group">
+      <button class="btn active" data-speed="1">1×</button>
+      <button class="btn" data-speed="5">5×</button>
+      <button class="btn" data-speed="10">10×</button>
+      <button class="btn" data-speed="50">50×</button>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <span>Flatness:</span>
+    <div class="progress-bar"><div class="progress-fill" id="flatnessBar"></div></div>
+    <span id="flatnessVal">0.0 mm</span>
+  </div>
+</div>
+
+<div class="main">
+
+  <div class="col-left">
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Spreader Bar</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Bar Length</span><span class="val" id="v_L_bar">1.900 m</span></div>
+          <input type="range" id="s_L_bar" min="1.5" max="2.5" step="0.01" value="1.9">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Curvature Radius</span><span class="val" id="v_R_curv">0.300 m</span></div>
+          <input type="range" id="s_R_curv" min="0.1" max="1.0" step="0.01" value="0.3">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Spread Angle</span><span class="val" id="v_theta_spread">5.0°</span></div>
+          <input type="range" id="s_theta_spread" min="1" max="15" step="0.5" value="5">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Edge Guides</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Guide Pressure</span><span class="val" id="v_P_guide">30.0 N</span></div>
+          <input type="range" id="s_P_guide" min="5" max="100" step="1" value="30">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Guide Friction μ</span><span class="val" id="v_mu_guide">0.250</span></div>
+          <input type="range" id="s_mu_guide" min="0.05" max="0.8" step="0.01" value="0.25">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Lateral Stiffness</span><span class="val" id="v_k_lat">2000 N/m</span></div>
+          <input type="range" id="s_k_lat" min="500" max="5000" step="50" value="2000">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Anti-Curl Rollers</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Curl Radius</span><span class="val" id="v_R_curl">0.050 m</span></div>
+          <input type="range" id="s_R_curl" min="0.02" max="0.15" step="0.001" value="0.05">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Bend Moment</span><span class="val" id="v_M_bend">8.00 N·m</span></div>
+          <input type="range" id="s_M_bend" min="1" max="30" step="0.5" value="8">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Fabric Thickness</span><span class="val" id="v_h_fabric">0.001 m</span></div>
+          <input type="range" id="s_h_fabric" min="0.0003" max="0.005" step="0.0001" value="0.001">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-header">Bending Model</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Flexural Rigidity</span><span class="val" id="v_EI">12.0 N·m²</span></div>
+          <input type="range" id="s_EI" min="1" max="50" step="0.5" value="12">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Relaxation Time</span><span class="val" id="v_tau_relax">0.500 s</span></div>
+          <input type="range" id="s_tau_relax" min="0.1" max="3" step="0.05" value="0.5">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Target Flatness</span><span class="val" id="v_flat_target">0.5 mm</span></div>
+          <input type="range" id="s_flat_target" min="0.1" max="5" step="0.1" value="0.5">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Web Inputs</div>
+      <div class="card-body">
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Web Speed</span><span class="val" id="v_v_web">0.500 m/s</span></div>
+          <input type="range" id="s_v_web" min="0.05" max="2" step="0.01" value="0.5">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Incoming Curl</span><span class="val" id="v_curl_in">2.00 mm</span></div>
+          <input type="range" id="s_curl_in" min="0" max="10" step="0.1" value="2">
+        </div>
+        <div class="slider-group">
+          <div class="slider-label"><span class="name">Edge Offset</span><span class="val" id="v_edge_off">0.50 mm</span></div>
+          <input type="range" id="s_edge_off" min="0" max="5" step="0.1" value="0.5">
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="col-center">
+
+    <div class="card">
+      <div class="card-header">Schematic — Worker 4 Fabric Flattening</div>
+      <div class="schematic-wrap">
+        <svg id="schematic" viewBox="0 0 600 240" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="20" height="20" patternUnits="userSpaceOnUse">
+              <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--chart-grid)" stroke-width="0.5"/>
+            </pattern>
+          </defs>
+          <rect width="600" height="240" fill="url(#grid)" opacity="0.4"/>
+
+          <!-- Incoming fabric (curled) -->
+          <path id="sch_incoming" d="M 30,100 Q 80,80 130,100" fill="none" stroke="var(--amber)" stroke-width="3" stroke-linecap="round"/>
+          <text x="80" y="75" font-size="8" fill="var(--amber)" text-anchor="middle">Incoming Curl</text>
+
+          <!-- Spreader bar (bowed shape) -->
+          <path id="sch_spreader" d="M 140,100 Q 200,70 260,100" fill="none" stroke="var(--green)" stroke-width="4" stroke-linecap="round"/>
+          <circle cx="140" cy="100" r="6" fill="var(--green)"/>
+          <circle cx="260" cy="100" r="6" fill="var(--green)"/>
+          <text x="200" y="60" font-size="9" fill="var(--green)" text-anchor="middle" font-weight="600">Spreader Bar</text>
+          <text id="sch_spread_angle" x="200" y="50" font-size="8" fill="var(--green)" text-anchor="middle" font-family="SF Mono, Menlo, monospace"></text>
+
+          <!-- Edge guides -->
+          <rect id="sch_edge_left" x="140" y="85" width="6" height="30" rx="2" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <rect id="sch_edge_right" x="254" y="85" width="6" height="30" rx="2" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.5"/>
+          <text x="143" y="78" font-size="7" fill="var(--accent)" text-anchor="middle">L</text>
+          <text x="257" y="78" font-size="7" fill="var(--accent)" text-anchor="middle">R</text>
+          <text x="200" y="130" font-size="8" fill="var(--accent)" text-anchor="middle">Edge Guides</text>
+
+          <!-- Anti-curl roller -->
+          <circle cx="340" cy="100" r="20" fill="none" stroke="var(--amber)" stroke-width="2.5"/>
+          <circle cx="340" cy="100" r="5" fill="var(--amber)"/>
+          <text x="340" y="135" font-size="9" fill="var(--amber)" text-anchor="middle" font-weight="600">Anti-Curl</text>
+
+          <!-- Flattened fabric path -->
+          <line x1="260" y1="100" x2="320" y2="100" stroke="var(--green)" stroke-width="3" stroke-linecap="round"/>
+          <line x1="360" y1="100" x2="440" y2="100" stroke="var(--green)" stroke-width="3" stroke-linecap="round"/>
+
+          <!-- Exit arrow -->
+          <polygon points="430,95 445,100 430,105" fill="var(--green)" opacity="0.7"/>
+          <text x="445" y="88" font-size="9" fill="var(--green)" text-anchor="middle">Flattened →</text>
+
+          <!-- Flatness indicator -->
+          <g transform="translate(460, 70)">
+            <rect x="0" y="0" width="80" height="50" rx="6" fill="var(--surface)" stroke="var(--border)" stroke-width="1"/>
+            <text x="40" y="16" font-size="8" fill="var(--text-muted)" text-anchor="middle" font-weight="600">Flatness</text>
+            <text id="sch_flatness" x="40" y="35" font-size="12" fill="var(--green)" text-anchor="middle" font-weight="700" font-family="SF Mono, Menlo, monospace"></text>
+          </g>
+
+          <!-- Edge offset indicator -->
+          <text id="sch_edge_offset" x="200" y="155" font-size="9" fill="var(--accent)" text-anchor="middle" font-family="SF Mono, Menlo, monospace"></text>
+
+          <!-- Web speed -->
+          <text id="sch_web_speed" x="340" y="175" font-size="9" fill="var(--text-muted)" text-anchor="middle" font-family="SF Mono, Menlo, monospace"></text>
+
+          <text x="300" y="215" font-size="8" fill="var(--text-muted)" text-anchor="middle">Spreader + Edge Guides + Anti-Curl Rollers</text>
+        </svg>
+      </div>
+    </div>
+
+    <div class="charts-grid">
+
+      <div class="chart-card">
+        <div class="chart-title">Current Signature i(t) <span class="ct-value" id="ct_I_sig" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_signature" height="130"></canvas></div>
+      </div>
+
+      <div class="chart-card">
+        <div class="chart-title">Flatness Deviation <span class="ct-value" id="ct_flat" style="color:#378ADD">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_flatness" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Edge Lateral Offset <span class="ct-value" id="ct_edge" style="color:#BA7517">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_edge" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Bend Moment Applied <span class="ct-value" id="ct_bend" style="color:#D85A30">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_bend" height="130"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Curl Residual <span class="ct-value" id="ct_curl" style="color:#1D9E75">—</span></div>
+        <div class="chart-canvas-wrap"><canvas id="chart_curl" height="130"></canvas></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="formula-chain-toggle" id="formulaToggle">
+        <span>Formula Chain (8 steps, parallel exec) <span class="parallel-badge">⚡ Parallel</span></span>
+        <span class="arrow" id="formulaArrow">▶</span>
+      </div>
+      <div class="formula-chain-body" id="formulaBody">
+        <div class="formula-step">
+          <span class="step-title">Step 1 — Incoming Curl Profile <span class="parallel-tag">2 parallel</span></span>
+          <span class="step-eq">[PARALLEL] curl_angle = curl_in / (2π · R_curv) · 360°</span><br>
+          <span class="step-eq">[PARALLEL] y_curl(x) = curl_amp · sin(π · x / w_fabric)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 2 — Spreader Bar Action <span class="sequential-tag">3 sequential</span></span>
+          <span class="step-eq">[SEQ] F_spread = T_web · sin(θ_spread)</span><br>
+          <span class="step-eq">[SEQ] R_contact = R_curv · (1 − cos(θ_spread))</span><br>
+          <span class="step-eq">[SEQ] y_spread(x) = −R_contact · (1 − (2x/w)²)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 3 — Edge Guide Lateral Force <span class="parallel-tag">2 parallel → 1 dependent</span></span>
+          <span class="step-eq">[PARALLEL] F_guide = P_guide · μ_guide</span><br>
+          <span class="step-eq">[PARALLEL] F_restoring = k_lat · x_edge_offset</span><br>
+          <span class="step-eq">[DEPENDENT] F_lateral = F_guide − F_restoring</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 4 — Edge Lateral Dynamics <span class="sequential-tag">3 sequential</span></span>
+          <span class="step-eq">[SEQ] a_lateral = F_lateral / m_edge</span><br>
+          <span class="step-eq">[SEQ] v_lateral(t) = v_lateral(t−1) + a · dt</span><br>
+          <span class="step-eq">[SEQ] x_edge(t) = x_edge(t−1) + v_lat · dt</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 5 — Anti-Curl Bending <span class="sequential-tag">2 sequential</span></span>
+          <span class="step-eq">[SEQ] κ = 1 / R_curl (curvature imposed)</span><br>
+          <span class="step-eq">[SEQ] M_applied = EI · (κ − κ_natural)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 6 — Beam Deflection Model <span class="parallel-tag">2 parallel → 1 dependent</span></span>
+          <span class="step-eq">[PARALLEL] δ_max = (F · L³) / (48 · EI)</span><br>
+          <span class="step-eq">[PARALLEL] σ_bend = M · h / (2 · I_section)</span><br>
+          <span class="step-eq">[DEPENDENT] flatness_dev = |δ_max − y_curl| + |x_edge|</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 7 — Viscoelastic Relaxation <span class="sequential-tag">2 sequential</span></span>
+          <span class="step-eq">[SEQ] curl_resid(t) = curl_in · e^(−t/τ_relax)</span><br>
+          <span class="step-eq">[SEQ] curl_rate = −curl_in / τ_relax · e^(−t/τ_relax)</span>
+        </div>
+        <div class="formula-step">
+          <span class="step-title">Step 8 — Flatness Quality Metric <span class="sequential-tag">2 sequential</span></span>
+          <span class="step-eq">[SEQ] flatness_RMS = √(flatness_dev² + curl_resid²)</span><br>
+          <span class="step-eq">[SEQ] flatness_flag = (flatness_RMS > flat_target) ? 1 : 0</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="col-right">
+
+    <div class="card" style="margin-top:10px;">
+      <div class="card-header">Energy Fault Injection</div>
+      <div class="card-body" style="padding:10px; display:flex; gap:10px;">
+        <label style="font-size:11px;"><input type="checkbox" id="chk_stall"> Stall (I > 2.5x)</label>
+        <label style="font-size:11px;"><input type="checkbox" id="chk_overcurrent"> Overcurrent (1.5x)</label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">Live State Variables</div>
+      <div class="card-body">
+        <div class="state-grid" id="stateGrid"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const WORKER_CODE = `
+self.onmessage = function(e) {
+  const { id, fn, params } = e.data;
+  let result;
+  const p = params;
+  switch(fn) {
+    case 'power_electronics': // LAYER A
+      result = { V_dc: 1.35 * p.V_line, V_bus: p.V_line * 1.35 - (p.I_load || 0) * p.R_bus, D: p.V_input ? p.V_input / (p.V_line * 1.35 + 1e-6) : 0.5, P_sw: 0.5 * (p.V_line * 1.35) * (p.I_load || 0) * (p.t_r + p.t_f) * p.f_sw, E_gate: 0.5 * p.C_gate * p.V_gs * p.V_gs };
+      break;
+    case 'motor_electrical_adv': // LAYER B
+      result = { delta_I: ((p.V_bus || 600) - (p.K_e||0.1) * (p.omega || 0)) * p.D * (1/p.f_sw) / (p.L_motor||0.05), P_elec: (p.V_input || 0) * (p.I_load || 0), P_cu: (p.I_load || 0) * (p.I_load || 0) * (p.R_motor||0.1), P_fe: p.k_h * p.f_elec * p.B_field * p.B_field + p.k_e * p.f_elec * p.f_elec * p.B_field * p.B_field };
+      break;
+    case 'current_signature': // LAYER C
+      result = { I_env: (p.T_load||10) / ((p.K_t||0.1) * p.efficiency), f_mesh: p.N_teeth * ((p.omega||0) * 60 / (2 * Math.PI)) / 60, f_bpfo: (p.N_balls / 2) * (((p.omega||0) * 60 / (2 * Math.PI)) / 60) * (1 - (p.d_ball / p.D_pitch) * Math.cos(p.alpha_contact)), THD_i: 0.05 };
+      break;
+    case 'mechanical_drive': // LAYER D
+      result = { theta_twist: (p.T_net || 0) * p.L_shaft / (p.G_shear * p.J_polar), delta_belt: (p.F_belt || 0) * p.L_belt / (p.E_belt * p.A_belt), P_gear: (p.T_net || 0) * (p.omega || 0) * (1 - p.eta_gear), T_bearing: (p.mu_b||0.01) * p.F_radial * p.r_bearing, omega_crit: Math.sqrt(p.k_shaft / p.J_shaft) };
+      break;
+    case 'load_energy': // LAYER E
+      result = { E_tension: 0.5 * (p.T_tension || 0)**2 * p.L_span / (p.E_fabric * p.A_fabric), P_nip: (p.F_nip || 0) / (2 * (p.r_roller || 0.1) * (p.w_fabric || 1)), Q_fabric: p.k_fabric * p.A_heat * (p.dT_dx || 0), E_meniscus: Math.PI * p.r_nozzle**2 * p.gamma_ink, E_piezo: 0.5 * p.C_piezo * p.V_drive**2 };
+      break;
+
+    case 'curl_angle':
+      result = p.curl_in / (2 * Math.PI * p.R_curv) * 360;
+      break;
+    case 'curl_profile':
+      result = p.curl_amp * Math.sin(Math.PI * p.x / p.w_fabric);
+      break;
+    case 'spread_force':
+      result = p.T_web * Math.sin(p.theta_spread);
+      break;
+    case 'contact_radius':
+      result = p.R_curv * (1 - Math.cos(p.theta_spread));
+      break;
+    case 'spread_profile':
+      result = -p.R_contact * (1 - Math.pow(2 * p.x / p.w, 2));
+      break;
+    case 'guide_force':
+      result = p.P_guide * p.mu_guide;
+      break;
+    case 'restoring_force':
+      result = p.k_lat * p.x_offset;
+      break;
+    case 'lateral_force':
+      result = p.F_guide - p.F_restoring;
+      break;
+    case 'lateral_acceleration':
+      result = p.F_lat / p.m_edge;
+      break;
+    case 'lateral_velocity':
+      result = p.v_prev + p.a * p.dt;
+      break;
+    case 'edge_position':
+      result = p.x_prev + p.v * p.dt;
+      break;
+    case 'curvature':
+      result = 1 / (p.R_curl > 0.001 ? p.R_curl : 0.001);
+      break;
+    case 'bend_moment':
+      result = p.EI * (p.kappa - p.kappa_natural);
+      break;
+    case 'beam_deflection':
+      result = (p.F * Math.pow(p.L, 3)) / (48 * p.EI);
+      break;
+    case 'bend_stress':
+      result = p.M * p.h / (2 * p.I_section);
+      break;
+    case 'flatness_deviation':
+      result = Math.abs(p.delta_max - p.y_curl) + Math.abs(p.x_edge);
+      break;
+    case 'curl_residual':
+      result = p.curl_in * Math.exp(-p.t / p.tau_relax);
+      break;
+    case 'curl_rate':
+      result = -p.curl_in / p.tau_relax * Math.exp(-p.t / p.tau_relax);
+      break;
+    case 'flatness_rms':
+      result = Math.sqrt(Math.pow(p.flat_dev, 2) + Math.pow(p.curl_res, 2));
+      break;
+    case 'flatness_flag':
+      result = p.flatness_rms > p.flat_target ? 1 : 0;
+      break;
+    default:
+      result = NaN;
+  }
+  self.postMessage({ id, result });
+};
+`;
+
+const WORKER_POOL_SIZE = 4;
+const workerPool = [];
+const workerQueue = [];
+let workerIdCounter = 0;
+
+function createWorker() {
+  const blob = new Blob([WORKER_CODE], { type: 'application/javascript' });
+  const url = URL.createObjectURL(blob);
+  const worker = new Worker(url);
+  worker.busy = false;
+  worker.pending = null;
+  URL.revokeObjectURL(url);
+  return worker;
+}
+
+function initWorkerPool() {
+  for (let i = 0; i < WORKER_POOL_SIZE; i++) {
+    const w = createWorker();
+    w.onmessage = function(e) {
+      w.busy = false;
+      if (w.pending) {
+        const { resolve } = w.pending;
+        w.pending = null;
+        resolve(e.data.result);
+      }
+      drainWorkerQueue(w);
+    };
+    workerPool.push(w);
+  }
+}
+
+function drainWorkerQueue(worker) {
+  if (workerQueue.length === 0) return;
+  const task = workerQueue.shift();
+  worker.busy = true;
+  worker.postMessage({ id: task.id, fn: task.fn, params: task.params });
+}
+
+function execFormula(fn, params) {
+  return new Promise(resolve => {
+    const idle = workerPool.find(w => !w.busy);
+    if (idle) {
+      idle.busy = true;
+      idle.onmessage = function(e) {
+        idle.busy = false;
+        resolve(e.data.result);
+        drainWorkerQueue(idle);
+      };
+      idle.postMessage({ id: workerIdCounter++, fn, params });
+    } else {
+      workerQueue.push({ id: workerIdCounter++, fn, params, resolve });
+    }
+  });
+}
+
+async function execParallel(formulas) {
+  return Promise.all(formulas.map(f => execFormula(f.fn, f.params)));
+}
+
+const PARAMS = {
+  // LAYER A-E Energy Chain Params
+  D_pwm: 0.5, V_bus_nom: 600, t_r: 1e-7, t_f: 1e-7, f_sw: 10000, C_gate: 1e-9, V_gs: 15, R_bus: 0.1, V_line: 400,
+  k_h: 0.01, k_e: 0.001, B_field: 1.5, f_elec: 50,
+  efficiency: 0.9, N_teeth: 50, N_balls: 8, d_ball: 0.01, D_pitch: 0.05, alpha_contact: 0, I_nominal: 10,
+  L_shaft: 1.0, G_shear: 79e9, J_polar: 1e-4, L_belt: 2.0, E_belt: 1e9, A_belt: 0.001, eta_gear: 0.98, F_radial: 500, r_bearing: 0.02, k_shaft: 1e6, J_shaft: 0.05,
+  L_span: 1.0, k_fabric: 0.5, A_heat: 1.0, gamma_ink: 0.03, r_nozzle: 1e-5, C_piezo: 1e-6, V_drive: 50,
+  L_bar: 1.9, R_curv: 0.3, theta_spread: 5,
+  P_guide: 30, mu_guide: 0.25, k_lat: 2000,
+  R_curl: 0.05, M_bend: 8, h_fabric: 0.001,
+  EI: 12, tau_relax: 0.5, flat_target: 0.5,
+  v_web: 0.5, curl_in: 2, edge_offset: 0.5,
+  w_fabric: 1.85, T_web: 60, m_edge: 0.5,
+};
+
+const DT = 0.01;
+
+const state = {
+  I_env: 0, delta_I: 0, fault_stall: false, fault_overcurrent: false,
+  curl_angle: 0, y_curl: 0,
+  F_spread: 0, R_contact: 0, y_spread: 0,
+  F_guide: 0, F_restoring: 0, F_lateral: 0,
+  a_lateral: 0, v_lateral: 0, x_edge: 0.5,
+  kappa: 0, M_applied: 0,
+  delta_max: 0, sigma_bend: 0, flatness_dev: 0,
+  curl_resid: 2, curl_rate: 0,
+  flatness_rms: 2, flatness_flag: 0,
+  simTime: 0, tickCount: 0, running: false, speed: 1,
+};
+
+const HIST_LEN = 300, SPARK_LEN = 50;
+const hist = { flatness_dev: [], x_edge: [], M_applied: [], curl_resid: [] };
+  hist.I_signature = []; spark.I_signature = [];
+const spark = { flatness_dev:[], x_edge:[], M_applied:[], curl_resid:[], F_spread:[], F_lateral:[], kappa:[], v_lateral:[] };
+
+function pushHist(arr, val) { arr.push(val); if (arr.length > HIST_LEN) arr.shift(); }
+function pushSpark(arr, val) { arr.push(val); if (arr.length > SPARK_LEN) arr.shift(); }
+
+const sliderMap = [
+  { id:'s_L_bar', key:'L_bar', fmt:v=>v.toFixed(3)+' m', d:'v_L_bar' },
+  { id:'s_R_curv', key:'R_curv', fmt:v=>v.toFixed(3)+' m', d:'v_R_curv' },
+  { id:'s_theta_spread', key:'theta_spread', fmt:v=>v.toFixed(1)+'°', d:'v_theta_spread' },
+  { id:'s_P_guide', key:'P_guide', fmt:v=>v.toFixed(1)+' N', d:'v_P_guide' },
+  { id:'s_mu_guide', key:'mu_guide', fmt:v=>v.toFixed(3), d:'v_mu_guide' },
+  { id:'s_k_lat', key:'k_lat', fmt:v=>v.toFixed(0)+' N/m', d:'v_k_lat' },
+  { id:'s_R_curl', key:'R_curl', fmt:v=>v.toFixed(3)+' m', d:'v_R_curl' },
+  { id:'s_M_bend', key:'M_bend', fmt:v=>v.toFixed(2)+' N·m', d:'v_M_bend' },
+  { id:'s_h_fabric', key:'h_fabric', fmt:v=>v.toFixed(4)+' m', d:'v_h_fabric' },
+  { id:'s_EI', key:'EI', fmt:v=>v.toFixed(1)+' N·m²', d:'v_EI' },
+  { id:'s_tau_relax', key:'tau_relax', fmt:v=>v.toFixed(3)+' s', d:'v_tau_relax' },
+  { id:'s_flat_target', key:'flat_target', fmt:v=>v.toFixed(1)+' mm', d:'v_flat_target' },
+  { id:'s_v_web', key:'v_web', fmt:v=>v.toFixed(3)+' m/s', d:'v_v_web' },
+  { id:'s_curl_in', key:'curl_in', fmt:v=>v.toFixed(1)+' mm', d:'v_curl_in' },
+  { id:'s_edge_off', key:'edge_offset', fmt:v=>v.toFixed(1)+' mm', d:'v_edge_off' },
+];
+
+sliderMap.forEach(s => {
+  const el = document.getElementById(s.id);
+  const disp = document.getElementById(s.d);
+  el.value = PARAMS[s.key];
+  disp.textContent = s.fmt(PARAMS[s.key]);
+  el.addEventListener('input', () => { PARAMS[s.key] = parseFloat(el.value); disp.textContent = s.fmt(PARAMS[s.key]); });
+});
+
+async function tick() {
+  const p = PARAMS, s = state;
+
+  // Step 1: Incoming Curl Profile
+  const [cAngle, yCurl] = await execParallel([
+    { fn: 'curl_angle', params: { curl_in: p.curl_in, R_curv: p.R_curv } },
+    { fn: 'curl_profile', params: { curl_amp: p.curl_in, x: p.w_fabric / 2, w_fabric: p.w_fabric } }
+  ]);
+  s.curl_angle = cAngle;
+  s.y_curl = yCurl;
+
+  // Step 2: Spreader Bar Action
+  const [F_sp] = await execParallel([
+    { fn: 'spread_force', params: { T_web: p.T_web, theta_spread: p.theta_spread * Math.PI / 180 } }
+  ]);
+  s.F_spread = F_sp;
+  const [R_cont] = await execParallel([
+    { fn: 'contact_radius', params: { R_curv: p.R_curv, theta_spread: p.theta_spread * Math.PI / 180 } }
+  ]);
+  s.R_contact = R_cont;
+  const [ySpr] = await execParallel([
+    { fn: 'spread_profile', params: { R_contact: s.R_contact, x: p.w_fabric / 2, w: p.w_fabric } }
+  ]);
+  s.y_spread = ySpr;
+
+  // Step 3: Edge Guide Lateral Force
+  const [F_g, F_r] = await execParallel([
+    { fn: 'guide_force', params: { P_guide: p.P_guide, mu_guide: p.mu_guide } },
+    { fn: 'restoring_force', params: { k_lat: p.k_lat, x_offset: s.x_edge / 1000 } }
+  ]);
+  s.F_guide = F_g;
+  s.F_restoring = F_r;
+  const [F_lat] = await execParallel([
+    { fn: 'lateral_force', params: { F_guide: s.F_guide, F_restoring: s.F_restoring } }
+  ]);
+  s.F_lateral = F_lat;
+
+  // Step 4: Edge Lateral Dynamics
+  const [aLat] = await execParallel([
+    { fn: 'lateral_acceleration', params: { F_lat: s.F_lateral, m_edge: p.m_edge } }
+  ]);
+  s.a_lateral = aLat;
+  const [vLat] = await execParallel([
+    { fn: 'lateral_velocity', params: { v_prev: s.v_lateral, a: s.a_lateral, dt: DT } }
+  ]);
+  s.v_lateral = vLat;
+  const [xEd] = await execParallel([
+    { fn: 'edge_position', params: { x_prev: s.x_edge, v: s.v_lateral, dt: DT } }
+  ]);
+  s.x_edge = xEd;
+
+  // Step 5: Anti-Curl Bending
+  const [kap] = await execParallel([
+    { fn: 'curvature', params: { R_curl: p.R_curl } }
+  ]);
+  s.kappa = kap;
+  const [M_app] = await execParallel([
+    { fn: 'bend_moment', params: { EI: p.EI, kappa: s.kappa, kappa_natural: 0 } }
+  ]);
+  s.M_applied = M_app;
+
+  // Step 6: Beam Deflection Model
+  const [dMax] = await execParallel([
+    { fn: 'beam_deflection', params: { F: s.F_spread, L: p.L_bar, EI: p.EI } }
+  ]);
+  s.delta_max = dMax;
+  const I_section = p.w_fabric * Math.pow(p.h_fabric, 3) / 12;
+  const [sigB] = await execParallel([
+    { fn: 'bend_stress', params: { M: s.M_applied, h: p.h_fabric, I_section } }
+  ]);
+  s.sigma_bend = sigB;
+  const [fDev] = await execParallel([
+    { fn: 'flatness_deviation', params: { delta_max: s.delta_max, y_curl: s.y_curl, x_edge: s.x_edge / 1000 } }
+  ]);
+  s.flatness_dev = fDev;
+
+  // Step 7: Viscoelastic Relaxation
+  const [cRes] = await execParallel([
+    { fn: 'curl_residual', params: { curl_in: p.curl_in, t: s.simTime, tau_relax: p.tau_relax } }
+  ]);
+  s.curl_resid = cRes;
+  const [cRate] = await execParallel([
+    { fn: 'curl_rate', params: { curl_in: p.curl_in, t: s.simTime, tau_relax: p.tau_relax } }
+  ]);
+  s.curl_rate = cRate;
+
+  // Step 8: Flatness Quality Metric
+  const [fRms] = await execParallel([
+    { fn: 'flatness_rms', params: { flat_dev: s.flatness_dev * 1000, curl_res: s.curl_resid } }
+  ]);
+  s.flatness_rms = fRms;
+  const [fFlag] = await execParallel([
+    { fn: 'flatness_flag', params: { flatness_rms: s.flatness_rms, flat_target: p.flat_target } }
+  ]);
+  s.flatness_flag = fFlag;
+
+  
+  // ── LAYER A-E: Energy Chain (Parallel) ──
+  if (typeof execParallel === 'function') {
+    const [resA, resB, resC, resD, resE] = await execParallel([
+      { fn: 'power_electronics', params: { V_line: p.V_line, I_load: s.I_motor || s.I_load || 0, R_bus: p.R_bus, V_input: s.V_input || 0, t_r: p.t_r, t_f: p.t_f, f_sw: p.f_sw, C_gate: p.C_gate, V_gs: p.V_gs } },
+      { fn: 'motor_electrical_adv', params: { K_e: p.K_e, omega: s.omega || 0, V_bus: 600, D: 0.5, f_sw: p.f_sw, L_motor: p.L_motor, V_input: s.V_input || 0, I_load: s.I_motor || s.I_load || 0, R_motor: p.R_motor, k_h: p.k_h, f_elec: p.f_elec, B_field: p.B_field, k_e: p.k_e } },
+      { fn: 'current_signature', params: { omega: s.omega || 0, T_load: s.T_load || p.T_load, K_t: p.K_t, efficiency: p.efficiency, N_teeth: p.N_teeth, N_balls: p.N_balls, d_ball: p.d_ball, D_pitch: p.D_pitch, alpha_contact: p.alpha_contact } },
+      { fn: 'mechanical_drive', params: { T_net: s.T_net || 0, L_shaft: p.L_shaft, G_shear: p.G_shear, J_polar: p.J_polar, F_belt: s.F_belt || 0, L_belt: p.L_belt, E_belt: p.E_belt, A_belt: p.A_belt, omega: s.omega || 0, eta_gear: p.eta_gear, mu_b: p.mu_b || 0.01, F_radial: p.F_radial, r_bearing: p.r_bearing, k_shaft: p.k_shaft, J_shaft: p.J_shaft } },
+      { fn: 'load_energy', params: { T_tension: s.T_tension || 0, L_span: p.L_span, E_fabric: p.E_fabric || 1e9, A_fabric: p.A_fabric || 0.001, F_nip: s.F_nip || 0, r_roller: p.r_roller || 0.1, w_fabric: p.w_fabric || 1, k_fabric: p.k_fabric, A_heat: p.A_heat, dT_dx: s.dT_dx || 0, r_nozzle: p.r_nozzle, gamma_ink: p.gamma_ink, C_piezo: p.C_piezo, V_drive: p.V_drive } }
+    ]);
+    s.I_env = resC.I_env;
+    s.delta_I = resB.delta_I;
+  }
+  if (s.fault_stall) s.I_env *= 2.5;
+  if (s.fault_overcurrent) s.I_env *= 1.5;
+  
+  if (typeof hist !== 'undefined' && hist.I_signature) {
+     hist.I_signature.push(s.I_env || 0); if (hist.I_signature.length > 300) hist.I_signature.shift();
+     if (typeof spark !== 'undefined' && spark.I_signature) { spark.I_signature.push(s.I_env || 0); if (spark.I_signature.length > 50) spark.I_signature.shift(); }
+  }
+
+  s.tickCount++;
+  s.simTime += DT;
+
+  pushHist(hist.flatness_dev, s.flatness_dev * 1000);
+  pushHist(hist.x_edge, s.x_edge);
+  pushHist(hist.M_applied, s.M_applied);
+  pushHist(hist.curl_resid, s.curl_resid);
+  pushSpark(spark.flatness_dev, s.flatness_dev * 1000);
+  pushSpark(spark.x_edge, s.x_edge);
+  pushSpark(spark.M_applied, s.M_applied);
+  pushSpark(spark.curl_resid, s.curl_resid);
+  pushSpark(spark.F_spread, s.F_spread);
+  pushSpark(spark.F_lateral, s.F_lateral);
+  pushSpark(spark.kappa, s.kappa);
+  pushSpark(spark.v_lateral, s.v_lateral);
+}
+
+function drawChart(canvasId, data, color, refLine, refColor) {
+  const canvas = document.getElementById(canvasId);
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = rect.width, H = rect.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const pad = { top: 6, right: 10, bottom: 20, left: 48 };
+  const cw = W - pad.left - pad.right, ch = H - pad.top - pad.bottom;
+
+  let dMin = Infinity, dMax = -Infinity;
+  for (const v of data) { if (v < dMin) dMin = v; if (v > dMax) dMax = v; }
+  if (!isFinite(dMin)) { dMin = 0; dMax = 1; }
+  if (dMin === dMax) { dMin -= 1; dMax += 1; }
+  const range = dMax - dMin;
+  dMin -= range * 0.1; dMax += range * 0.1;
+
+  ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim() || 'rgba(0,0,0,0.08)';
+  ctx.lineWidth = 0.5;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.top + (i / 4) * ch;
+    ctx.beginPath(); ctx.moveTo(pad.left, y); ctx.lineTo(pad.left + cw, y); ctx.stroke();
+    const val = dMax - (i / 4) * (dMax - dMin);
+    ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#6b7280';
+    ctx.font = '9px SF Mono, Menlo, monospace'; ctx.textAlign = 'right';
+    ctx.fillText(val.toFixed(val >= 100 ? 0 : val >= 1 ? 1 : 2), pad.left - 4, y + 3);
+  }
+
+  if (refLine !== undefined) {
+    const ry = pad.top + (1 - (refLine - dMin) / (dMax - dMin)) * ch;
+    ctx.strokeStyle = refColor || '#D85A30'; ctx.lineWidth = 1; ctx.setLineDash([4, 3]);
+    ctx.beginPath(); ctx.moveTo(pad.left, ry); ctx.lineTo(pad.left + cw, ry); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (data.length < 2) return;
+  ctx.strokeStyle = color; ctx.lineWidth = 1.5; ctx.lineJoin = 'round'; ctx.beginPath();
+  for (let i = 0; i < data.length; i++) {
+    const x = pad.left + (i / (HIST_LEN - 1)) * cw;
+    const y = pad.top + (1 - (data[i] - dMin) / (dMax - dMin)) * ch;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function sparkSVG(data, color, w, h) {
+  if (data.length < 2) return '';
+  let lo = Infinity, hi = -Infinity;
+  for (const v of data) { if (v < lo) lo = v; if (v > hi) hi = v; }
+  if (lo === hi) { lo -= 1; hi += 1; }
+  const range = hi - lo || 1;
+  const pts = data.map((v, i) => `${(i/(data.length-1)*w).toFixed(1)},${(h-((v-lo)/range)*(h-2)-1).toFixed(1)}`);
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts.join(' ')}" fill="none" stroke="${color}" stroke-width="1.2" stroke-linejoin="round"/></svg>`;
+}
+
+const stateVars = [
+  { key:'flatness_dev', sym:'δ_f(t)', name:'Flatness Deviation', unit:'mm', color:'#378ADD', warn:2, crit:4 },
+  { key:'x_edge', sym:'x_e(t)', name:'Edge Lateral Offset', unit:'mm', color:'#BA7517', warn:2, crit:4 },
+  { key:'M_applied', sym:'M(t)', name:'Bend Moment Applied', unit:'N·m', color:'#D85A30', warn:20, crit:28 },
+  { key:'curl_resid', sym:'c_r(t)', name:'Curl Residual', unit:'mm', color:'#1D9E75', warn:1.5, crit:3 },
+  { key:'F_spread', sym:'F_s(t)', name:'Spread Force', unit:'N', color:'#378ADD', warn:null, crit:null },
+  { key:'F_lateral', sym:'F_l(t)', name:'Lateral Guide Force', unit:'N', color:'#BA7517', warn:15, crit:25 },
+  { key:'kappa', sym:'κ(t)', name:'Imposed Curvature', unit:'1/m', color:'#1D9E75', warn:null, crit:null },
+  { key:'v_lateral', sym:'v_l(t)', name:'Lateral Velocity', unit:'mm/s', color:'#D85A30', warn:5, crit:10 },
+];
+
+function buildStateCards() {
+  document.getElementById('stateGrid').innerHTML = stateVars.map(sv =>
+    `<div class="state-card ok" id="sc_${sv.key}">
+      <div class="sc-left">
+        <div class="sc-sym">${sv.sym}</div>
+        <div class="sc-name">${sv.name}</div>
+        <div class="sc-val" id="scv_${sv.key}">—<span class="sc-unit">${sv.unit}</span></div>
+      </div>
+      <div class="sc-sparkline" id="sp_${sv.key}"></div>
+    </div>`
+  ).join('');
+}
+
+function updateStateCards() {
+  stateVars.forEach(sv => {
+    const val = state[sv.key];
+    const card = document.getElementById(`sc_${sv.key}`);
+    let status = 'ok';
+    if (sv.crit !== null && val > sv.crit) status = 'crit';
+    else if (sv.warn !== null && val > sv.warn) status = 'warn';
+    card.className = `state-card ${status}`;
+    document.getElementById(`scv_${sv.key}`).innerHTML = `${sigFig(val,4)}<span class="sc-unit">${sv.unit}</span>`;
+    document.getElementById(`sp_${sv.key}`).innerHTML = sparkSVG(spark[sv.key], sv.color, 64, 32);
+  });
+}
+
+function sigFig(n, sf) {
+  if (!Number.isFinite(n)) return '—';
+  if (n === 0) return '0';
+  return n.toFixed(Math.max(0, sf - 1 - Math.floor(Math.log10(Math.abs(n)))));
+}
+
+function updateSchematic() {
+  const s = state, p = PARAMS;
+  const spreadDepth = (s.F_spread / 100) * 30;
+  document.getElementById('sch_spreader').setAttribute('d', `M 140,100 Q 200,${100 - spreadDepth} 260,100`);
+  document.getElementById('sch_spread_angle').textContent = 'θ = ' + p.theta_spread.toFixed(1) + '°';
+
+  const curlAmp = s.curl_resid * 3;
+  document.getElementById('sch_incoming').setAttribute('d', `M 30,100 Q 80,${100 - curlAmp} 130,100`);
+
+  const edgeShift = s.x_edge / 5;
+  document.getElementById('sch_edge_left').setAttribute('x', (140 + edgeShift).toFixed(0));
+  document.getElementById('sch_edge_right').setAttribute('x', (254 + edgeShift).toFixed(0));
+
+  document.getElementById('sch_flatness').textContent = s.flatness_rms.toFixed(1) + ' mm';
+  document.getElementById('sch_flatness').setAttribute('fill', s.flatness_rms > p.flat_target ? '#D85A30' : '#1D9E75');
+  document.getElementById('sch_edge_offset').textContent = 'Edge Δx = ' + s.x_edge.toFixed(1) + ' mm';
+  document.getElementById('sch_web_speed').textContent = 'v = ' + p.v_web.toFixed(2) + ' m/s';
+}
+
+function formatTime(sec) {
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+
+function updateTopBar() {
+  document.getElementById('simTime').textContent = formatTime(state.simTime);
+  const pct = Math.max(0, Math.min(100, 100 - (state.flatness_rms / 5) * 100));
+  document.getElementById('flatnessBar').style.width = pct.toFixed(1) + '%';
+  document.getElementById('flatnessBar').style.background = state.flatness_rms > PARAMS.flat_target ? 'var(--red)' : 'var(--green)';
+  document.getElementById('flatnessVal').textContent = state.flatness_rms.toFixed(1) + ' mm';
+}
+
+function updateChartValues() {
+  document.getElementById('ct_flat').textContent = (state.flatness_dev * 1000).toFixed(2) + ' mm';
+  document.getElementById('ct_edge').textContent = state.x_edge.toFixed(1) + ' mm';
+  document.getElementById('ct_bend').textContent = state.M_applied.toFixed(2) + ' N·m';
+  document.getElementById('ct_curl').textContent = state.curl_resid.toFixed(2) + ' mm';
+}
+
+const btnPlay = document.getElementById('btnPlay');
+btnPlay.addEventListener('click', () => {
+  state.running = !state.running;
+  btnPlay.textContent = state.running ? '⏸ Pause' : '▶ Play';
+  btnPlay.classList.toggle('primary', !state.running);
+  btnPlay.classList.toggle('danger', state.running);
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  state.running = false;
+  btnPlay.textContent = '▶ Play'; btnPlay.classList.add('primary'); btnPlay.classList.remove('danger');
+  state.curl_angle = 0; state.y_curl = 0;
+  state.F_spread = 0; state.R_contact = 0; state.y_spread = 0;
+  state.F_guide = 0; state.F_restoring = 0; state.F_lateral = 0;
+  state.a_lateral = 0; state.v_lateral = 0; state.x_edge = 0.5;
+  state.kappa = 0; state.M_applied = 0;
+  state.delta_max = 0; state.sigma_bend = 0; state.flatness_dev = 0;
+  state.curl_resid = 2; state.curl_rate = 0;
+  state.flatness_rms = 2; state.flatness_flag = 0;
+  state.simTime = 0; state.tickCount = 0;
+  hist.flatness_dev=[]; hist.x_edge=[]; hist.M_applied=[]; hist.curl_resid=[];
+  Object.keys(spark).forEach(k => spark[k]=[]);
+});
+
+document.querySelectorAll('.speed-group .btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.speed-group .btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active'); state.speed = parseInt(btn.dataset.speed);
+  });
+});
+
+document.getElementById('formulaToggle').addEventListener('click', () => {
+  const body = document.getElementById('formulaBody');
+  const arrow = document.getElementById('formulaArrow');
+  const open = body.classList.toggle('open');
+  arrow.classList.toggle('open', open);
+});
+
+function render() {
+
+  const sigCanvas = document.getElementById('chart_signature');
+  if (sigCanvas && typeof drawChart === 'function' && hist.I_signature) {
+     drawChart('chart_signature', hist.I_signature, '#BA7517');
+     const ct_I_sig = document.getElementById('ct_I_sig');
+     if (ct_I_sig) ct_I_sig.textContent = (state.I_env || 0).toFixed(2) + ' A';
+  }
+
+  drawChart('chart_flatness', hist.flatness_dev, '#378ADD', PARAMS.flat_target, '#D85A30');
+  drawChart('chart_edge', hist.x_edge, '#BA7517');
+  drawChart('chart_bend', hist.M_applied, '#D85A30');
+  drawChart('chart_curl', hist.curl_resid, '#1D9E75');
+  updateSchematic(); updateStateCards(); updateTopBar(); updateChartValues();
+}
+
+async function loop() {
+  if (state.running) {
+    for (let i = 0; i < state.speed; i++) { await tick(); }
+  }
+  render();
+  requestAnimationFrame(loop);
+}
+
+initWorkerPool();
+buildStateCards();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
